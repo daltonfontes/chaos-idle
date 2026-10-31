@@ -5,6 +5,7 @@ using ChaosIdle.Cli;
 //   dotnet run --project src/ChaosIdle.Cli -- compare [runs=200] [firstSeed=1]
 //   dotnet run --project src/ChaosIdle.Cli -- expedition [seed=1] [patrols=8]
 //   dotnet run --project src/ChaosIdle.Cli -- builds [runs=100] [firstSeed=1]
+//   dotnet run --project src/ChaosIdle.Cli -- offline [hoursAway=10] [seed=1]
 CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
 CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -19,11 +20,14 @@ switch (command)
     case "builds":
         BuildsCommand.Run(rest);
         break;
+    case "offline":
+        OfflineCommand.Run(rest);
+        break;
     case "expedition":
         ExpeditionCommand.Run(rest);
         break;
     default:
-        Console.Error.WriteLine($"Unknown command '{command}'. Use compare, expedition, or builds.");
+        Console.Error.WriteLine($"Unknown command '{command}'. Use compare, expedition, builds, or offline.");
         return 1;
 }
 

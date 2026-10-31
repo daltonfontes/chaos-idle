@@ -6,6 +6,7 @@ using ChaosIdle.Simulation.Analysis;
 using ChaosIdle.Simulation.Combat;
 using ChaosIdle.Simulation.Diagnostics;
 using ChaosIdle.Simulation.Expeditions;
+using ChaosIdle.Simulation.Offline;
 
 namespace ChaosIdle.Simulation.Reporting
 {
@@ -152,6 +153,54 @@ namespace ChaosIdle.Simulation.Reporting
                 default: return "NO CHANGE";
             }
         }
+
+        /// <summary>The "welcome back" summary of an offline session.</summary>
+        public static IReadOnlyList<string> Return(OfflineResult result, OfflineClaim? claim, string? activeHint = null)
+        {
+            var lines = new List<string>();
+            if (result.ClockAnomaly)
+            {
+                lines.Add("Welcome back. Your device clock moved backwards, so no offline time was counted.");
+                return lines;
+            }
+
+            if (result.TooShort)
+            {
+                lines.Add($"Welcome back. You were away {Duration(result.TimeAway)}; offline progress starts after a minute.");
+                return lines;
+            }
+
+            string capped = result.WasCapped ? $"; {Duration(result.CreditedTime)} counted (offline limit)" : "";
+            lines.Add($"Welcome back. You were away {Duration(result.TimeAway)}{capped}.");
+            lines.Add($"{result.Checkpoint.Map.Name}: {result.RunsAttempted} runs, {result.RunsCompleted} completed ({result.SuccessRate.ToString("P0", Inv)}).");
+
+            if (result.RunsFailed > 0)
+            {
+                lines.Add($"{result.RunsFailed} run(s) failed and brought nothing back.");
+                foreach (var d in result.FailureExamples.OrderByDescending(d => result.FailureReasons[d.Code]).Take(2))
+                {
+                    lines.Add($"  • {d.Message}");
+                }
+
+                lines.Add("Try: " + string.Join(" ", result.FailureExamples.Select(d => Advice(d.Code)).Distinct().Take(2)));
+            }
+
+            lines.Add($"Found: {LootLine(result.Loot)}");
+            if (claim != null)
+            {
+                var parts = new List<string> { $"Brought home {claim.Kept.Count}" + (claim.Kept.Count(claim.Highlighted.Contains) is int h && h > 0 ? $" ({h} highlighted ★)" : "") };
+                if (claim.Hidden.Count > 0) parts.Add($"{claim.Hidden.Count} hidden by your loot filter");
+                if (claim.OverStorageCap.Count > 0) parts.Add($"{claim.OverStorageCap.Count} over the offline storage limit");
+                if (claim.NoBagSpace.Count > 0) parts.Add($"{claim.NoBagSpace.Count} with no bag space");
+                lines.Add(string.Join("; ", parts) + ".");
+            }
+
+            if (activeHint != null) lines.Add(activeHint);
+            return lines;
+        }
+
+        public static string Duration(System.TimeSpan t) =>
+            t.TotalHours >= 1 ? $"{(int)t.TotalHours}h {t.Minutes:00}m" : t.TotalMinutes >= 1 ? $"{(int)t.TotalMinutes}m {t.Seconds:00}s" : $"{t.Seconds}s";
 
         public static string Time(double seconds) =>
             seconds >= 60
