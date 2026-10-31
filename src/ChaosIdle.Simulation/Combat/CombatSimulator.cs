@@ -52,6 +52,7 @@ namespace ChaosIdle.Simulation.Combat
             private readonly double _leechPercent;
             private readonly double _lifeOnBlock;
             private readonly double _actionTime;
+            private readonly double _manaCost;
             private readonly double[] _triggerReadyAt;
 
             private readonly Dictionary<string, double> _damageBySkill = new Dictionary<string, double>();
@@ -89,6 +90,7 @@ namespace ChaosIdle.Simulation.Combat
                 _leechPercent = Math.Max(0, _stats.Flat(StatId.LifeLeechPercent));
                 _lifeOnBlock = Math.Max(0, _stats.Flat(StatId.LifeOnBlock));
                 _actionTime = DamagePipeline.ActionTime(build.PrimarySkill, build.Weapon, _stats);
+                _manaCost = DamagePipeline.ManaCost(build.PrimarySkill, _stats);
                 _triggerReadyAt = new double[build.TriggeredSkills.Count];
 
                 _life = _maxLife;
@@ -186,15 +188,15 @@ namespace ChaosIdle.Simulation.Combat
             private void PlayerAct()
             {
                 var skill = _build.PrimarySkill;
-                if (_mana + Epsilon < skill.ManaCost)
+                if (_mana + Epsilon < _manaCost)
                 {
-                    double wait = _manaRegen > 0 ? (skill.ManaCost - _mana) / _manaRegen : double.PositiveInfinity;
+                    double wait = _manaRegen > 0 ? (_manaCost - _mana) / _manaRegen : double.PositiveInfinity;
                     _report.TimeOutOfMana += Math.Min(wait, _options.MaxDurationSeconds - _time);
                     _playerNext = _time + wait;
                     return;
                 }
 
-                _mana = Math.Max(0, _mana - skill.ManaCost);
+                _mana = Math.Max(0, _mana - _manaCost);
                 _report.PrimarySkillUses++;
                 HitEnemy(skill);
                 _playerNext = _time + _actionTime;
