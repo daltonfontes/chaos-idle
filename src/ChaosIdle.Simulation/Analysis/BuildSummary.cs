@@ -42,8 +42,9 @@ namespace ChaosIdle.Simulation.Analysis
             var stats = build.ComputeStats();
             var defence = DefenceStats.From(stats);
             var skill = build.PrimarySkill;
-            double hit = DamagePipeline.ExpectedHit(skill, build.Weapon, stats).Total;
-            double rate = 1.0 / DamagePipeline.ActionTime(skill, build.Weapon, stats);
+            var skillStats = build.ComputeSkillStats(skill);
+            double hit = DamagePipeline.ExpectedHit(skill, build.Weapon, skillStats).Total;
+            double rate = 1.0 / DamagePipeline.ActionTime(skill, build.Weapon, skillStats);
 
             return new BuildSummary
             {
@@ -60,10 +61,10 @@ namespace ChaosIdle.Simulation.Analysis
                 ColdResistance = System.Math.Min(defence.ColdResistance, CombatFormulas.MaxResistance),
                 LightningResistance = System.Math.Min(defence.LightningResistance, CombatFormulas.MaxResistance),
                 AverageHit = hit,
-                CritChance = DamagePipeline.CritChance(skill, build.Weapon, stats),
+                CritChance = DamagePipeline.CritChance(skill, build.Weapon, skillStats),
                 ActionsPerSecond = rate,
                 HitDamagePerSecond = hit * rate,
-                ManaCostPerUse = DamagePipeline.ManaCost(skill, stats),
+                ManaCostPerUse = DamagePipeline.ManaCost(skill, skillStats),
             };
         }
     }

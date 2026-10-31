@@ -4,6 +4,7 @@ using System.Linq;
 using ChaosIdle.Domain.Characters;
 using ChaosIdle.Domain.Expeditions;
 using ChaosIdle.Domain.Items;
+using ChaosIdle.Domain.Loot;
 using ChaosIdle.Domain.Monsters;
 using ChaosIdle.Simulation.Combat;
 using ChaosIdle.Simulation.Diagnostics;
@@ -57,26 +58,36 @@ namespace ChaosIdle.Simulation.Expeditions
         public bool IsClaimed { get; private set; }
 
         /// <summary>
-        /// Moves loot into the inventory. Items that do not fit are left behind and reported.
-        /// A report can be claimed once.
+        /// Moves loot into the inventory through a loot filter. Hidden items are never picked up;
+        /// highlighted items are picked up first so a nearly full bag keeps what matters. Items
+        /// that do not fit are left behind and reported. A report can be claimed once.
         /// </summary>
-        public LootClaim ClaimLoot(Inventory inventory)
+        public LootClaim ClaimLoot(Inventory inventory, LootFilter? filter = null)
         {
             if (IsClaimed) throw new InvalidOperationException("Expedition loot was already claimed.");
             IsClaimed = true;
+            filter ??= LootFilter.ShowEverything;
+
+            var decisions = Loot.Select(i => (Item: i, Decision: filter.Evaluate(i))).ToList();
+            var hidden = decisions.Where(d => d.Decision.Action == FilterAction.Hide).Select(d => d.Item).ToList();
+            var highlighted = decisions.Where(d => d.Decision.Action == FilterAction.Highlight).Select(d => d.Item).ToList();
+            var shown = decisions.Where(d => d.Decision.Action == FilterAction.Show).Select(d => d.Item);
 
             var kept = new List<Item>();
             var leftBehind = new List<Item>();
-            foreach (var item in Loot)
+            foreach (var item in highlighted.Concat(shown))
             {
                 (inventory.TryAdd(item) ? kept : leftBehind).Add(item);
             }
 
-            return new LootClaim(kept, leftBehind);
+            return new LootClaim(kept, leftBehind, hidden, highlighted);
         }
     }
 
-    public sealed record LootClaim(IReadOnlyList<Item> Kept, IReadOnlyList<Item> LeftBehind);
+    /// <param name="Hidden">Items the loot filter hid; never picked up.</param>
+    /// <param name="Highlighted">Items the loot filter highlighted (kept or left behind).</param>
+    public sealed record LootClaim(IReadOnlyList<Item> Kept, IReadOnlyList<Item> LeftBehind,
+        IReadOnlyList<Item> Hidden, IReadOnlyList<Item> Highlighted);
 
     public sealed class ExpeditionRunner
     {

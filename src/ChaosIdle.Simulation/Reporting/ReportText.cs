@@ -66,10 +66,17 @@ namespace ChaosIdle.Simulation.Reporting
             return $"{loot.Count} item(s) ({string.Join(", ", byRarity)})";
         }
 
-        public static string Claim(LootClaim claim) =>
-            claim.LeftBehind.Count == 0
-                ? $"Added {claim.Kept.Count} item(s) to your bag."
-                : $"Added {claim.Kept.Count} item(s); {claim.LeftBehind.Count} left behind because your bag is full.";
+        public static string Claim(LootClaim claim)
+        {
+            var parts = new List<string>();
+            int highlightedKept = claim.Kept.Count(claim.Highlighted.Contains);
+            parts.Add(highlightedKept > 0
+                ? $"Added {claim.Kept.Count} item(s) to your bag ({highlightedKept} highlighted ★)"
+                : $"Added {claim.Kept.Count} item(s) to your bag");
+            if (claim.Hidden.Count > 0) parts.Add($"{claim.Hidden.Count} hidden by your loot filter");
+            if (claim.LeftBehind.Count > 0) parts.Add($"{claim.LeftBehind.Count} left behind because your bag is full");
+            return string.Join("; ", parts) + ".";
+        }
 
         public static string Advice(DiagnosisCode code)
         {
@@ -88,7 +95,8 @@ namespace ChaosIdle.Simulation.Reporting
 
         public static IReadOnlyList<string> ItemTooltip(Item item)
         {
-            var lines = new List<string> { $"{item.Name} [{item.Rarity}] — item level {item.ItemLevel}" };
+            string baseName = item.Unique != null ? $" ({item.Base.Name})" : "";
+            var lines = new List<string> { $"{item.Name}{baseName} [{item.Rarity}] — item level {item.ItemLevel}" };
             if (item.Class.IsWeapon())
             {
                 var w = item.ToWeapon();
@@ -102,7 +110,8 @@ namespace ChaosIdle.Simulation.Reporting
                 if (item.Base.BlockChance > 0) lines.Add($"  Block chance {item.Base.BlockChance.ToString("0", Inv)}%");
             }
 
-            foreach (var a in item.Affixes) lines.Add($"  {a.Text}  (T{a.Tier})");
+            foreach (var a in item.Affixes) lines.Add(item.Unique != null ? $"  {a.Text}" : $"  {a.Text}  (T{a.Tier})");
+            if (item.Unique != null && item.Unique.FlavourText.Length > 0) lines.Add($"  \"{item.Unique.FlavourText}\"");
             return lines;
         }
 
@@ -116,6 +125,20 @@ namespace ChaosIdle.Simulation.Reporting
                 lines.Add($"  {arrow}  {c.Label}: {c.Before.ToString(c.Format, Inv)} → {c.After.ToString(c.Format, Inv)}");
             }
 
+            return lines;
+        }
+
+        public static IReadOnlyList<string> BuildComparison(BuildProfile a, BuildProfile b, IReadOnlyList<BuildContrast> contrasts)
+        {
+            var lines = new List<string>();
+            foreach (var p in new[] { a, b })
+            {
+                var strengths = contrasts.Where(c => c.Leader == p.BuildId).ToList();
+                lines.Add($"{p.BuildName}: {strengths.Count} strength(s)");
+                foreach (var c in strengths) lines.Add($"  + {c.Text}");
+            }
+
+            if (contrasts.Count == 0) lines.Add("No meaningful difference: these builds play the same.");
             return lines;
         }
 

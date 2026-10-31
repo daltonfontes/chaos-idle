@@ -44,5 +44,13 @@ namespace ChaosIdle.Domain.Stats
 
         /// <summary>Flag (Flat &gt; 0): block chance also applies to spells.</summary>
         BlockAppliesToSpells = 60,
+
+        /// <summary>Flat percent of physical damage converted (combined with skill conversions).</summary>
+        PhysicalToFireConversion = 70,
+        PhysicalToColdConversion = 71,
+        PhysicalToLightningConversion = 72,
+
+        /// <summary>Increased/More: cooldowns are divided by this stat's scaling.</summary>
+        CooldownRecovery = 80,
     }
 }

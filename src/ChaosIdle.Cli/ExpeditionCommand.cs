@@ -22,7 +22,7 @@ internal static class ExpeditionCommand
         ulong seed = args.Length > 0 ? ulong.Parse(args[0]) : 1;
         int patrols = args.Length > 1 ? int.Parse(args[1]) : 8;
 
-        var runner = new ExpeditionRunner(new LootGenerator(ItemBases.All, Affixes.All));
+        var runner = new ExpeditionRunner(new LootGenerator(ItemBases.All, Affixes.All, uniques: Uniques.All));
         var guardian = StarterCharacters.NewGuardian();
         guardian.Passives = PassiveAllocation.FromPath(PassiveTrees.Guardian, StarterCharacters.StartingPassivePoints, StarterCharacters.BulwarkPath);
 
@@ -51,7 +51,7 @@ internal static class ExpeditionCommand
     {
         var report = runner.Run(character, expedition, seed);
         foreach (var line in ReportText.Expedition(report)) Console.WriteLine(line);
-        var claim = report.ClaimLoot(character.Inventory);
+        var claim = report.ClaimLoot(character.Inventory, BuildRelevance.FilterFor(character.ToBuild()));
         Console.WriteLine(ReportText.Claim(claim));
         return claim.Kept;
     }

@@ -13,6 +13,11 @@ automatic combat, and bounded offline expeditions.
   - Not done: the Unity client.
 
   See [`docs/milestone-2.md`](docs/milestone-2.md).
+- **Milestone 3 — buildcraft:** the domain half is done.
+  - Done: 8 support modifiers with explicit compatibility rules, 4 unique items each with a
+    drawback, a loot filter with a build-aware preset, and scenario-based build comparison.
+  - Gate: two equally invested builds are both viable, with opposite strengths. See
+    [`docs/milestone-3.md`](docs/milestone-3.md).
 
 ## Layout
 
@@ -21,7 +26,7 @@ automatic combat, and bounded offline expeditions.
 | `src/ChaosIdle.Domain` | Pure rules: stats and modifiers, combat formulas, skills, passive tree, items, equipment, inventory, characters, expeditions. |
 | `src/ChaosIdle.Simulation` | Deterministic random numbers, damage pipeline, combat simulator, failure analysis, loot generation, build summary and item comparison, expedition runner, player-facing report text. |
 | `src/ChaosIdle.Content` | Original content with stable IDs: class, skills, passive tree, item bases, affixes, monsters, encounters, expeditions, starter character. |
-| `src/ChaosIdle.Cli` | `compare` (the Milestone 1 build table) and `expedition` (the Milestone 2 loop as text). |
+| `src/ChaosIdle.Cli` | `compare` (the Milestone 1 build table), `expedition` (the Milestone 2 loop as text), and `builds` (the Milestone 3 reference-build comparison). |
 | `tests/ChaosIdle.Tests` | xUnit tests: formulas, pipeline, simulator invariants, diagnosis, passives, items, loot, comparison, expeditions, and both milestone gates. |
 
 The library projects target `netstandard2.1` with C# 9, so Unity can use them unchanged later.
@@ -43,6 +48,10 @@ dotnet run --project src/ChaosIdle.Cli -- compare 200 1   # runs per build/encou
 
 ```bash
 dotnet run --project src/ChaosIdle.Cli -- expedition 1 8  # seed, number of farming runs
+```
+
+```bash
+dotnet run --project src/ChaosIdle.Cli -- builds 100 1    # runs per scenario, first seed
 ```
 
 ## For Claude Code

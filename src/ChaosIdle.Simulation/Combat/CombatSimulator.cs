@@ -47,9 +47,7 @@ namespace ChaosIdle.Simulation.Combat
             private readonly double _maxMana;
             private readonly double _lifeRegen;
             private readonly double _manaRegen;
-            private readonly double _accuracy;
-            private readonly double _penetration;
-            private readonly double _leechPercent;
+            private readonly Dictionary<string, StatBlock> _skillStats = new Dictionary<string, StatBlock>();
             private readonly double _lifeOnBlock;
             private readonly double _actionTime;
             private readonly double _manaCost;
@@ -85,12 +83,15 @@ namespace ChaosIdle.Simulation.Combat
                 _maxMana = Math.Max(0, _stats.Resolve(StatId.MaxMana));
                 _lifeRegen = Math.Max(0, _stats.Resolve(StatId.LifeRegenPerSecond));
                 _manaRegen = Math.Max(0, _stats.Resolve(StatId.ManaRegenPerSecond));
-                _accuracy = _stats.Resolve(StatId.Accuracy);
-                _penetration = _stats.Flat(StatId.ElementalPenetration);
-                _leechPercent = Math.Max(0, _stats.Flat(StatId.LifeLeechPercent));
                 _lifeOnBlock = Math.Max(0, _stats.Flat(StatId.LifeOnBlock));
-                _actionTime = DamagePipeline.ActionTime(build.PrimarySkill, build.Weapon, _stats);
-                _manaCost = DamagePipeline.ManaCost(build.PrimarySkill, _stats);
+                foreach (var skill in build.TriggeredSkills.Append(build.PrimarySkill))
+                {
+                    _skillStats[skill.Id] = build.ComputeSkillStats(skill);
+                }
+
+                var primaryStats = _skillStats[build.PrimarySkill.Id];
+                _actionTime = DamagePipeline.ActionTime(build.PrimarySkill, build.Weapon, primaryStats);
+                _manaCost = DamagePipeline.ManaCost(build.PrimarySkill, primaryStats);
                 _triggerReadyAt = new double[build.TriggeredSkills.Count];
 
                 _life = _maxLife;
@@ -204,8 +205,11 @@ namespace ChaosIdle.Simulation.Combat
 
             private void HitEnemy(SkillDefinition skill)
             {
-                var hit = DamagePipeline.RollPlayerHit(skill, _build.Weapon, _stats, _rng);
-                var result = DamagePipeline.Resolve(hit.Damage, hit.IsSpell, _accuracy, _penetration, _enemyDefence, _rng);
+                // Offence uses the skill's own stat block (character stats + its supports).
+                var stats = _skillStats[skill.Id];
+                var hit = DamagePipeline.RollPlayerHit(skill, _build.Weapon, stats, _rng);
+                var result = DamagePipeline.Resolve(hit.Damage, hit.IsSpell, stats.Resolve(StatId.Accuracy),
+                    stats.Flat(StatId.ElementalPenetration), _enemyDefence, _rng);
                 double dealt = Math.Min(result.Taken.Total, Math.Max(0, _enemyLife));
                 _enemyLife -= result.Taken.Total;
 
@@ -213,7 +217,7 @@ namespace ChaosIdle.Simulation.Combat
                 _damageBySkill[skill.Id] = sum + dealt;
                 _report.TotalDamageDealt += dealt;
 
-                double leech = Math.Min(dealt * _leechPercent / 100.0, _maxLife - _life);
+                double leech = Math.Min(dealt * Math.Max(0, stats.Flat(StatId.LifeLeechPercent)) / 100.0, _maxLife - _life);
                 if (leech > 0)
                 {
                     _life += leech;
@@ -288,7 +292,7 @@ namespace ChaosIdle.Simulation.Combat
                         continue;
                     }
 
-                    _triggerReadyAt[i] = _time + skill.CooldownSeconds;
+                    _triggerReadyAt[i] = _time + DamagePipeline.Cooldown(skill, _skillStats[skill.Id]);
                     _report.TriggeredSkillUses++;
                     HitEnemy(skill);
                 }

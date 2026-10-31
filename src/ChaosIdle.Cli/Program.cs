@@ -4,6 +4,7 @@ using ChaosIdle.Cli;
 // Usage:
 //   dotnet run --project src/ChaosIdle.Cli -- compare [runs=200] [firstSeed=1]
 //   dotnet run --project src/ChaosIdle.Cli -- expedition [seed=1] [patrols=8]
+//   dotnet run --project src/ChaosIdle.Cli -- builds [runs=100] [firstSeed=1]
 CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
 CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -15,11 +16,14 @@ switch (command)
     case "compare":
         CompareCommand.Run(rest);
         break;
+    case "builds":
+        BuildsCommand.Run(rest);
+        break;
     case "expedition":
         ExpeditionCommand.Run(rest);
         break;
     default:
-        Console.Error.WriteLine($"Unknown command '{command}'. Use 'compare' or 'expedition'.");
+        Console.Error.WriteLine($"Unknown command '{command}'. Use compare, expedition, or builds.");
         return 1;
 }
 
