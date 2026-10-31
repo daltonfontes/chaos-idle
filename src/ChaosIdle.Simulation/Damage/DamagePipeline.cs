@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using ChaosIdle.Domain.Combat;
 using ChaosIdle.Domain.Items;
 using ChaosIdle.Domain.Monsters;
@@ -136,7 +137,7 @@ namespace ChaosIdle.Simulation.Damage
             }
 
             // 3. Conversion (from pre-conversion amounts; no chaining).
-            ApplyConversions(damage, skill.Conversions);
+            ApplyConversions(damage, EffectiveConversions(skill, stats));
 
             // 4. Increased (summed) then More (multiplied), by final damage type and skill tags.
             foreach (var type in DamageTypes.All)
@@ -149,6 +150,42 @@ namespace ChaosIdle.Simulation.Damage
 
             return damage;
         }
+
+        /// <summary>
+        /// The skill's own conversions plus conversions granted by stats (supports, items).
+        /// If more than 100% of a type would be converted, every conversion from that type is
+        /// scaled down proportionally so the total is exactly 100%.
+        /// </summary>
+        public static IReadOnlyList<DamageConversion> EffectiveConversions(SkillDefinition skill, StatBlock stats)
+        {
+            var all = new List<DamageConversion>(skill.Conversions);
+            AddStatConversion(all, stats, StatId.PhysicalToFireConversion, DamageType.Fire);
+            AddStatConversion(all, stats, StatId.PhysicalToColdConversion, DamageType.Cold);
+            AddStatConversion(all, stats, StatId.PhysicalToLightningConversion, DamageType.Lightning);
+
+            var result = new List<DamageConversion>(all.Count);
+            foreach (var group in all.GroupBy(c => c.From))
+            {
+                double total = group.Sum(c => c.Percent);
+                double scale = total > 100 ? 100 / total : 1;
+                foreach (var c in group)
+                {
+                    result.Add(scale == 1 ? c : c with { Percent = c.Percent * scale });
+                }
+            }
+
+            return result;
+        }
+
+        private static void AddStatConversion(List<DamageConversion> list, StatBlock stats, StatId stat, DamageType to)
+        {
+            double percent = stats.Flat(stat);
+            if (percent > 0) list.Add(new DamageConversion(DamageType.Physical, to, percent));
+        }
+
+        /// <summary>Cooldown after CooldownRecovery scaling.</summary>
+        public static double Cooldown(SkillDefinition skill, StatBlock stats) =>
+            skill.CooldownSeconds / stats.ScalingMultiplier(StatId.CooldownRecovery);
 
         public static DamageSet RollEnemyHit(EnemyAttackDefinition attack, IRandom rng)
         {

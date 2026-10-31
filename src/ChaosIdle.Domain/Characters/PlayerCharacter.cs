@@ -48,6 +48,31 @@ namespace ChaosIdle.Domain.Characters
         public SkillDefinition PrimarySkill { get; set; } = new SkillDefinition();
         public List<SkillDefinition> TriggeredSkills { get; } = new List<SkillDefinition>();
 
+        private readonly Dictionary<string, List<SupportDefinition>> _supports = new Dictionary<string, List<SupportDefinition>>();
+
+        public IReadOnlyList<SupportDefinition> SupportsFor(SkillDefinition skill) =>
+            _supports.TryGetValue(skill.Id, out var list) ? list : (IReadOnlyList<SupportDefinition>)new SupportDefinition[0];
+
+        /// <summary>Links a support to one of the character's skills, if the rules allow it.</summary>
+        public SupportCompatibility LinkSupport(SkillDefinition skill, SupportDefinition support)
+        {
+            if (skill.Id != PrimarySkill.Id && TriggeredSkills.All(s => s.Id != skill.Id))
+            {
+                throw new System.ArgumentException($"{Name} does not use {skill.Id}.");
+            }
+
+            var linked = SupportsFor(skill);
+            var check = support.CanLink(skill, linked.ToList());
+            if (check != SupportCompatibility.Compatible) return check;
+
+            if (!_supports.TryGetValue(skill.Id, out var list)) _supports[skill.Id] = list = new List<SupportDefinition>();
+            list.Add(support);
+            return SupportCompatibility.Compatible;
+        }
+
+        public bool UnlinkSupport(SkillDefinition skill, SupportDefinition support) =>
+            _supports.TryGetValue(skill.Id, out var list) && list.Remove(support);
+
         public WeaponDefinition Weapon => Equipment[EquipmentSlot.MainHand]?.ToWeapon() ?? Unarmed;
 
         public CharacterBuild ToBuild() => ToBuild(Equipment);
@@ -62,6 +87,10 @@ namespace ChaosIdle.Domain.Characters
             PrimarySkill = PrimarySkill,
             TriggeredSkills = TriggeredSkills.ToArray(),
             Modifiers = Passives.Modifiers().Concat(equipment.CharacterModifiers()).ToArray(),
+            SkillSupports = _supports
+                .Where(kv => kv.Key == PrimarySkill.Id || TriggeredSkills.Any(s => s.Id == kv.Key))
+                .Where(kv => kv.Value.Count > 0)
+                .ToDictionary(kv => kv.Key, kv => (IReadOnlyList<SupportDefinition>)kv.Value.ToArray()),
         };
 
         /// <summary>Moves an item from the bag into a slot; the replaced item goes back into the bag.</summary>

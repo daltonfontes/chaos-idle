@@ -15,3 +15,4 @@ jobs:
       - run: dotnet test --configuration Release
       - run: dotnet run --project src/ChaosIdle.Cli --configuration Release -- compare 100 1
       - run: dotnet run --project src/ChaosIdle.Cli --configuration Release -- expedition 1
+      - run: dotnet run --project src/ChaosIdle.Cli --configuration Release -- builds 50 1

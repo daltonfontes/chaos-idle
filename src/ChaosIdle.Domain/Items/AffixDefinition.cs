@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using ChaosIdle.Domain.Stats;
 
 namespace ChaosIdle.Domain.Items
@@ -43,7 +44,8 @@ namespace ChaosIdle.Domain.Items
             if (string.IsNullOrWhiteSpace(Group)) errors.Add($"{Id}: no group.");
             if (AllowedClasses.Count == 0) errors.Add($"{Id}: no allowed item classes.");
             if (Tiers.Count == 0) errors.Add($"{Id}: no tiers.");
-            if (!Text.Contains("{0}")) errors.Add($"{Id}: text has no {{0}} placeholder.");
+            bool fixedValue = Tiers.Count > 0 && Tiers.All(t => t.Min == t.Max);
+            if (!Text.Contains("{0}") && !fixedValue) errors.Add($"{Id}: text has no {{0}} placeholder but its value varies.");
             foreach (var t in Tiers)
             {
                 if (t.Min > t.Max) errors.Add($"{Id} T{t.Tier}: min > max.");

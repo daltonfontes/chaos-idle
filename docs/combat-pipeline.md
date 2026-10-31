@@ -19,6 +19,15 @@ On damage stats (`PhysicalDamage`, `FireDamage`, …), **Flat means added damage
 Resistances, block chance, life leech, life on block, penetration, and crit multiplier
 use only their Flat value.
 
+## Character stats and skill stats
+
+- **Character stats** come from the class, passives and gear. They decide defences, life,
+  mana, regeneration, and life on block.
+- **Skill stats** are the character stats plus the supports linked to that skill
+  (`CharacterBuild.ComputeSkillStats`). Everything offensive uses the skill's own stats:
+  damage, conversion, crit, speed, mana cost, accuracy, penetration, leech, and cooldown
+  recovery. A support never changes defences or another skill.
+
 ## Outgoing hit (attacker side)
 
 1. **Base damage**
@@ -26,8 +35,12 @@ use only their Flat value.
    - Spells: the skill's own base damage roll. Effectiveness does **not** scale this.
 2. **Added damage**: Flat damage-type stats × skill damage effectiveness (attacks and spells).
 3. **Conversion**: each conversion moves a percentage of the *pre-conversion* amount.
-   Conversions do not chain (phys→fire→cold moves nothing to cold), and at most 100% of a
-   type may be converted (validated).
+   - Conversions come from the skill itself plus the `PhysicalTo…Conversion` stats, which
+     supports and uniques grant.
+   - If more than 100% of a type would be converted, every conversion from that type is
+     scaled down proportionally to reach exactly 100%. For example, 60% to cold plus 60% to
+     fire becomes 50% plus 50%.
+   - Conversions do not chain: phys→fire→cold moves nothing to cold.
 4. **Scaling** per *final* damage type. Increased values are summed across the relevant
    stats, then More multipliers are applied. The relevant stats are:
    - `Damage` and the type's own stat (`PhysicalDamage`, `FireDamage`, …);
@@ -78,6 +91,7 @@ resistances and the life pool are the answer to spells.
 - **Turn order**: the next action is whichever of the player or the current enemy is due
   first. On ties, the player acts first.
 - **Regeneration**: life and mana regenerate continuously between events.
+- **Cooldowns** of triggered skills are divided by the `CooldownRecovery` scaling.
 - **Mana cost** per use is `(skill cost + flat ManaCost) × ManaCost scaling`, and never
   negative.
 - **Mana**: if the primary skill can't be afforded, the character waits exactly until it

@@ -11,6 +11,9 @@ namespace ChaosIdle.Domain.Items
         Normal = 0,
         Magic = 1,
         Rare = 2,
+
+        /// <summary>Fixed, named item with build-enabling modifiers and a drawback.</summary>
+        Unique = 3,
     }
 
     public sealed record RolledAffix(AffixDefinition Affix, int Tier, double Value)
@@ -26,7 +29,10 @@ namespace ChaosIdle.Domain.Items
         public int ItemLevel { get; init; } = 1;
         public IReadOnlyList<RolledAffix> Affixes { get; init; } = Array.Empty<RolledAffix>();
 
-        public string Name => Base.Name;
+        /// <summary>Set for unique items; their modifiers are in <see cref="Affixes"/>.</summary>
+        public UniqueDefinition? Unique { get; init; }
+
+        public string Name => Unique?.Name ?? Base.Name;
         public ItemClass Class => Base.Class;
 
         private string Source => "item:" + Id;

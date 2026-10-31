@@ -14,8 +14,9 @@ namespace ChaosIdle.Simulation.Loot
         public int NormalWeight { get; init; } = 70;
         public int MagicWeight { get; init; } = 25;
         public int RareWeight { get; init; } = 5;
+        public int UniqueWeight { get; init; } = 1;
 
-        /// <summary>Bosses multiply the magic and rare weights by this.</summary>
+        /// <summary>Bosses multiply the magic, rare and unique weights by this.</summary>
         public int BossRarityMultiplier { get; init; } = 4;
 
         public int MagicMinAffixes { get; init; } = 1;
@@ -31,10 +32,13 @@ namespace ChaosIdle.Simulation.Loot
     {
         private readonly IReadOnlyList<ItemBase> _bases;
         private readonly IReadOnlyList<AffixDefinition> _affixes;
+        private readonly IReadOnlyList<UniqueDefinition> _uniques;
 
-        public LootGenerator(IReadOnlyList<ItemBase> bases, IReadOnlyList<AffixDefinition> affixes, LootSettings? settings = null)
+        public LootGenerator(IReadOnlyList<ItemBase> bases, IReadOnlyList<AffixDefinition> affixes, LootSettings? settings = null,
+            IReadOnlyList<UniqueDefinition>? uniques = null)
         {
-            var errors = affixes.SelectMany(a => a.Validate()).ToList();
+            _uniques = uniques ?? Array.Empty<UniqueDefinition>();
+            var errors = affixes.SelectMany(a => a.Validate()).Concat(_uniques.SelectMany(u => u.Validate())).ToList();
             if (bases.Count == 0) errors.Add("No item bases.");
             if (errors.Count > 0) throw new ArgumentException("Invalid loot tables:\n" + string.Join("\n", errors));
 
@@ -59,11 +63,23 @@ namespace ChaosIdle.Simulation.Loot
 
         public Item Generate(int itemLevel, bool fromBoss, IRandom rng)
         {
+            var rarity = RollRarity(fromBoss, rng);
+            if (rarity == ItemRarity.Unique)
+            {
+                var eligibleUniques = _uniques.Where(u => u.Base.DropLevel <= itemLevel).ToList();
+                if (eligibleUniques.Count > 0)
+                {
+                    var unique = Pick(eligibleUniques, u => u.DropWeight, rng);
+                    return unique.Roll(NewId(rng), itemLevel, rng.NextDouble);
+                }
+
+                rarity = ItemRarity.Rare; // no unique can drop here: fall back to a rare
+            }
+
             var eligibleBases = _bases.Where(b => b.DropLevel <= itemLevel).ToList();
             if (eligibleBases.Count == 0) eligibleBases = _bases.ToList();
             var itemBase = Pick(eligibleBases, b => b.DropWeight, rng);
 
-            var rarity = RollRarity(fromBoss, rng);
             var affixes = RollAffixes(itemBase.Class, itemLevel, rarity, rng);
 
             return new Item
@@ -84,6 +100,7 @@ namespace ChaosIdle.Simulation.Loot
                 (Rarity: ItemRarity.Normal, Weight: Settings.NormalWeight),
                 (Rarity: ItemRarity.Magic, Weight: Settings.MagicWeight * bonus),
                 (Rarity: ItemRarity.Rare, Weight: Settings.RareWeight * bonus),
+                (Rarity: ItemRarity.Unique, Weight: _uniques.Count > 0 ? Settings.UniqueWeight * bonus : 0),
             };
             return Pick(table, t => t.Weight, rng).Rarity;
         }
