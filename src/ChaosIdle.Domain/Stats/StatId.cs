@@ -38,5 +38,11 @@ namespace ChaosIdle.Domain.Stats
 
         LifeLeechPercent = 40,
         LifeOnBlock = 41,
+
+        /// <summary>Mana cost of skills: Flat adds, Increased/More scale.</summary>
+        ManaCost = 50,
+
+        /// <summary>Flag (Flat &gt; 0): block chance also applies to spells.</summary>
+        BlockAppliesToSpells = 60,
     }
 }

@@ -5,19 +5,24 @@ automatic combat, and bounded offline expeditions.
 
 ## Status
 
-**Milestone 1 — Combat proof of concept** is in progress. There is a headless,
-deterministic C# combat simulator with one class (Guardian), three skills, four enemies
-including a boss, two sample builds, and failure diagnosis.
+- **Milestone 1 — combat proof of concept:** done. It's a headless, deterministic combat
+  simulator with failure diagnosis, and two sample builds with clearly different outcomes.
+- **Milestone 2 — vertical slice:** the domain half is done.
+  - Done: passive tree, items and affixes, loot, inventory, item comparison, expeditions,
+    and player-facing reports.
+  - Not done: the Unity client.
+
+  See [`docs/milestone-2.md`](docs/milestone-2.md).
 
 ## Layout
 
 | Project | Purpose |
 |---|---|
-| `src/ChaosIdle.Domain` | Pure rules: stats and modifiers, damage types, combat formulas, skill/weapon/enemy/build definitions. |
-| `src/ChaosIdle.Simulation` | Deterministic RNG, damage pipeline, combat simulator, failure analysis, batch runner. |
-| `src/ChaosIdle.Content` | Original content with stable IDs: class, skills, weapons, monsters, encounters, sample builds. |
-| `src/ChaosIdle.Cli` | Runs a seeded build comparison and prints reports. |
-| `tests/ChaosIdle.Tests` | xUnit tests for formulas, pipeline, simulator invariants, diagnosis, and the milestone gate. |
+| `src/ChaosIdle.Domain` | Pure rules: stats and modifiers, combat formulas, skills, passive tree, items, equipment, inventory, characters, expeditions. |
+| `src/ChaosIdle.Simulation` | Deterministic random numbers, damage pipeline, combat simulator, failure analysis, loot generation, build summary and item comparison, expedition runner, player-facing report text. |
+| `src/ChaosIdle.Content` | Original content with stable IDs: class, skills, passive tree, item bases, affixes, monsters, encounters, expeditions, starter character. |
+| `src/ChaosIdle.Cli` | `compare` (the Milestone 1 build table) and `expedition` (the Milestone 2 loop as text). |
+| `tests/ChaosIdle.Tests` | xUnit tests: formulas, pipeline, simulator invariants, diagnosis, passives, items, loot, comparison, expeditions, and both milestone gates. |
 
 The library projects target `netstandard2.1` with C# 9, so Unity can use them unchanged later.
 
@@ -33,7 +38,11 @@ dotnet test
 ```
 
 ```bash
-dotnet run --project src/ChaosIdle.Cli -- 200 1   # runs per build/encounter, first seed
+dotnet run --project src/ChaosIdle.Cli -- compare 200 1   # runs per build/encounter, first seed
+```
+
+```bash
+dotnet run --project src/ChaosIdle.Cli -- expedition 1 8  # seed, number of farming runs
 ```
 
 ## For Claude Code

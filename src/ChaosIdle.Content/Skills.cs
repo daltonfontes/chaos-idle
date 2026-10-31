@@ -11,7 +11,7 @@ namespace ChaosIdle.Content
             Id = "skill.iron_cleave",
             Name = "Iron Cleave",
             Tags = SkillTags.Attack | SkillTags.Melee,
-            ManaCost = 5,
+            ManaCost = 3,
             DamageEffectiveness = 120,
         };
 

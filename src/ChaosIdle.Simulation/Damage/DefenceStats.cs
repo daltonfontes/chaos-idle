@@ -12,6 +12,9 @@ namespace ChaosIdle.Simulation.Damage
         /// <summary>Percent, before the 75% cap.</summary>
         public double BlockChance { get; init; }
 
+        /// <summary>When true, block also applies to spells (still no evasion for spells).</summary>
+        public bool BlockSpells { get; init; }
+
         public double FireResistance { get; init; }
         public double ColdResistance { get; init; }
         public double LightningResistance { get; init; }
@@ -32,6 +35,7 @@ namespace ChaosIdle.Simulation.Damage
             Armour = stats.Resolve(StatId.Armour),
             Evasion = stats.Resolve(StatId.Evasion),
             BlockChance = stats.Flat(StatId.BlockChance),
+            BlockSpells = stats.Flat(StatId.BlockAppliesToSpells) > 0,
             FireResistance = stats.Flat(StatId.FireResistance),
             ColdResistance = stats.Flat(StatId.ColdResistance),
             LightningResistance = stats.Flat(StatId.LightningResistance),

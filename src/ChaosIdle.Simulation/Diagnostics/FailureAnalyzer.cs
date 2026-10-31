@@ -14,6 +14,9 @@ namespace ChaosIdle.Simulation.Diagnostics
         LargeHitSpike = 4,
         LowSustain = 5,
         ResourceStarvation = 6,
+
+        /// <summary>Fallback when a death matches no specific rule: steady damage outpaced defences.</summary>
+        Overwhelmed = 7,
     }
 
     /// <param name="DamageType">Set for type-specific findings such as low resistance.</param>
@@ -44,6 +47,10 @@ namespace ChaosIdle.Simulation.Diagnostics
             if (report.Outcome == CombatOutcome.Death)
             {
                 AnalyzeDeath(report, defence, findings);
+                if (findings.Count == 0)
+                {
+                    findings.Add(Overwhelmed(report));
+                }
             }
 
             if (report.DurationSeconds > 0 && report.TimeOutOfMana / report.DurationSeconds >= StarvationShare)
@@ -53,6 +60,21 @@ namespace ChaosIdle.Simulation.Diagnostics
             }
 
             return findings;
+        }
+
+        private static Diagnosis Overwhelmed(CombatReport report)
+        {
+            double window = report.RecentDamageTaken.Count == 0
+                ? 1
+                : System.Math.Max(1, report.DurationSeconds - report.RecentDamageTaken[0].Time);
+            double recent = report.RecentDamageTaken.Sum(e => e.Total);
+            string top = report.RecentDamageTaken
+                .GroupBy(e => e.AttackName)
+                .OrderByDescending(g => g.Sum(e => e.Total))
+                .Select(g => g.Key)
+                .FirstOrDefault() ?? "enemy attacks";
+            return new Diagnosis(DiagnosisCode.Overwhelmed,
+                $"Took {recent / window:0} damage per second at the end, mostly from {top}; no single defence was clearly missing, so raise life and mitigation overall or kill faster.");
         }
 
         private static void AnalyzeDeath(CombatReport report, DefenceStats defence, List<Diagnosis> findings)

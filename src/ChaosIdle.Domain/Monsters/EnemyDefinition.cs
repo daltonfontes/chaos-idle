@@ -39,9 +39,17 @@ namespace ChaosIdle.Domain.Monsters
         /// </summary>
         public IReadOnlyList<EnemyAttackDefinition> Attacks { get; init; } = Array.Empty<EnemyAttackDefinition>();
 
+        /// <summary>Chance in [0, 1] of one extra item drop on kill.</summary>
+        public double ItemDropChance { get; init; } = 0.15;
+
+        /// <summary>Items always dropped on kill (bosses).</summary>
+        public int GuaranteedDrops { get; init; }
+
         public IReadOnlyList<string> Validate()
         {
             var errors = new List<string>();
+            if (ItemDropChance < 0 || ItemDropChance > 1) errors.Add($"{Id}: ItemDropChance must be in [0, 1].");
+            if (GuaranteedDrops < 0) errors.Add($"{Id}: GuaranteedDrops cannot be negative.");
             if (MaxLife <= 0) errors.Add($"{Id}: MaxLife must be positive.");
             if (ActionTimeSeconds <= 0) errors.Add($"{Id}: ActionTimeSeconds must be positive.");
             if (Attacks.Count == 0) errors.Add($"{Id}: needs at least one attack.");

@@ -44,8 +44,9 @@ use only their Flat value.
 ## Defender side
 
 6. **Evasion** (attacks only): hit chance = `acc / (acc + evasion × 0.25)`, clamped to [5%, 100%].
-7. **Block** (attacks only): chance capped at 75%. A blocked hit deals 0 damage and fires
-   `OnBlock` triggers and life-on-block.
+7. **Block**: applies to attacks, and also to spells if the defender has
+   `BlockAppliesToSpells` (granted by the Unyielding Bastion keystone). The chance is capped
+   at 75%. A blocked hit deals 0 damage and fires `OnBlock` triggers and life-on-block.
 8. **Armour** (physical only): reduction = `armour / (armour + 8 × hit)`, capped at 85%.
    It is strong against many small hits and weak against one big hit.
 9. **Resistance** (elemental): `min(res, 75) − penetration`, floored at −100%.
@@ -54,8 +55,8 @@ use only their Flat value.
     `LifeLeechPercent` of the damage dealt, instantly and capped by missing life.
     Overkill is not counted as damage dealt.
 
-Spells can be neither evaded nor blocked in Milestone 1. Resistances and life pool are the
-answer to spells.
+Spells can never be evaded, and are blocked only with `BlockAppliesToSpells`. Otherwise,
+resistances and the life pool are the answer to spells.
 
 ## Randomness
 
@@ -77,6 +78,8 @@ answer to spells.
 - **Turn order**: the next action is whichever of the player or the current enemy is due
   first. On ties, the player acts first.
 - **Regeneration**: life and mana regenerate continuously between events.
+- **Mana cost** per use is `(skill cost + flat ManaCost) × ManaCost scaling`, and never
+  negative.
 - **Mana**: if the primary skill can't be afforded, the character waits exactly until it
   can. This waiting is reported as time out of mana. Triggered skills cost no mana and use
   their own cooldowns.
@@ -98,6 +101,14 @@ answer to spells.
 | `LargeHitSpike` | The killing blow was ≥40% of max life. |
 | `LowSustain` | Died after recovering <15% of the damage taken. |
 | `ResourceStarvation` | ≥15% of the fight was spent waiting for mana. |
+| `Overwhelmed` | Died, and no other death rule matched. It reports damage per second at the end and the main attack, so every death has a reason. |
+
+## Expected values (tooltips and comparison)
+
+`DamagePipeline.ExpectedHit` runs steps 1–4 with every base roll at its midpoint, then
+multiplies by `1 + critChance × (critMultiplier − 1)`. `BuildSummary` and `ItemComparer`
+use it; the simulator never does. Because both share the same step functions, tooltips
+can't drift from combat.
 
 ## Known simplifications (to revisit)
 

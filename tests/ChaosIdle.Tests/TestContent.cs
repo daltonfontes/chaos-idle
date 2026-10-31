@@ -28,6 +28,18 @@ internal static class TestContent
 
     public static Encounter Fight(params EnemyDefinition[] enemies) => new() { Id = "test.fight", Name = "Test", Enemies = enemies };
 
+    /// <summary>Eight harmless, fragile enemies that always drop one item each.</summary>
+    public static Encounter LootPinata() => Fight(Enumerable.Range(0, 8)
+        .Select(i => Dummy(50) with { Id = $"test.pinata{i}", ItemDropChance = 1 }).ToArray());
+
+    public static ChaosIdle.Domain.Characters.PlayerCharacter StarterWithPassives()
+    {
+        var c = StarterCharacters.NewGuardian();
+        c.Passives = ChaosIdle.Domain.PassiveTree.PassiveAllocation.FromPath(
+            PassiveTrees.Guardian, StarterCharacters.StartingPassivePoints, StarterCharacters.BulwarkPath);
+        return c;
+    }
+
     public static CharacterBuild With(this CharacterBuild build, params Modifier[] extra) =>
         build with { Modifiers = build.Modifiers.Concat(extra).ToArray() };
 }

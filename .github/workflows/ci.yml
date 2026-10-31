@@ -13,4 +13,5 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - run: dotnet test --configuration Release
-      - run: dotnet run --project src/ChaosIdle.Cli --configuration Release -- 100 1
+      - run: dotnet run --project src/ChaosIdle.Cli --configuration Release -- compare 100 1
+      - run: dotnet run --project src/ChaosIdle.Cli --configuration Release -- expedition 1

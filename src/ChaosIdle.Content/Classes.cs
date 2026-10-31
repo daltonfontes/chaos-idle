@@ -13,7 +13,7 @@ namespace ChaosIdle.Content
             {
                 new Modifier(StatId.MaxLife, ModifierKind.Flat, 400, "class.guardian"),
                 new Modifier(StatId.MaxMana, ModifierKind.Flat, 80, "class.guardian"),
-                new Modifier(StatId.ManaRegenPerSecond, ModifierKind.Flat, 4, "class.guardian"),
+                new Modifier(StatId.ManaRegenPerSecond, ModifierKind.Flat, 5, "class.guardian"),
                 new Modifier(StatId.Accuracy, ModifierKind.Flat, 500, "class.guardian"),
                 new Modifier(StatId.Armour, ModifierKind.Flat, 150, "class.guardian"),
                 new Modifier(StatId.Evasion, ModifierKind.Flat, 50, "class.guardian"),

@@ -15,6 +15,7 @@ namespace ChaosIdle.Content
             Evasion = 200,
             Accuracy = 400,
             ActionTimeSeconds = 0.9,
+            ItemDropChance = 0.12,
             Attacks = new[]
             {
                 new EnemyAttackDefinition
@@ -34,6 +35,7 @@ namespace ChaosIdle.Content
             FireResistance = 40,
             Accuracy = 400,
             ActionTimeSeconds = 1.4,
+            ItemDropChance = 0.15,
             Attacks = new[]
             {
                 new EnemyAttackDefinition
@@ -53,6 +55,7 @@ namespace ChaosIdle.Content
             Armour = 600,
             Accuracy = 350,
             ActionTimeSeconds = 1.8,
+            ItemDropChance = 0.35,
             Attacks = new[]
             {
                 new EnemyAttackDefinition
@@ -79,6 +82,7 @@ namespace ChaosIdle.Content
             LightningResistance = 30,
             Accuracy = 600,
             ActionTimeSeconds = 1.5,
+            GuaranteedDrops = 3,
             Attacks = new[]
             {
                 new EnemyAttackDefinition

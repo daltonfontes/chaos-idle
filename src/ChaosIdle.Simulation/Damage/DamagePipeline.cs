@@ -63,19 +63,69 @@ namespace ChaosIdle.Simulation.Damage
         /// <summary>Steps 1-5: roll an outgoing player hit.</summary>
         public static OutgoingHit RollPlayerHit(SkillDefinition skill, WeaponDefinition weapon, StatBlock stats, IRandom rng)
         {
+            var damage = ScaledDamage(skill, weapon, stats, rng.NextDouble);
+
+            // 5. Critical strike. The roll is always consumed so RNG streams stay aligned across builds.
+            bool isCritical = rng.NextDouble() < CritChance(skill, weapon, stats);
+            if (isCritical)
+            {
+                double multiplier = CritMultiplier(stats);
+                foreach (var type in DamageTypes.All)
+                {
+                    damage[type] *= multiplier;
+                }
+            }
+
+            return new OutgoingHit(damage, isCritical, skill.IsSpell);
+        }
+
+        /// <summary>
+        /// Average hit before defender mitigation, with crits folded in as an expectation.
+        /// Used for tooltips and item comparison; the simulator never uses it.
+        /// </summary>
+        public static DamageSet ExpectedHit(SkillDefinition skill, WeaponDefinition weapon, StatBlock stats)
+        {
+            var damage = ScaledDamage(skill, weapon, stats, () => 0.5);
+            double critFactor = 1 + CritChance(skill, weapon, stats) * (CritMultiplier(stats) - 1);
+            foreach (var type in DamageTypes.All)
+            {
+                damage[type] *= critFactor;
+            }
+
+            return damage;
+        }
+
+        /// <summary>Probability in [0, 1].</summary>
+        public static double CritChance(SkillDefinition skill, WeaponDefinition weapon, StatBlock stats)
+        {
+            double baseCrit = skill.IsAttack ? weapon.CritChance : skill.BaseCritChance;
+            double percent = (baseCrit + stats.Flat(StatId.CriticalChance)) * stats.ScalingMultiplier(StatId.CriticalChance);
+            return CombatFormulas.PercentToChance(percent, CombatFormulas.MaxCritChance);
+        }
+
+        public static double CritMultiplier(StatBlock stats) =>
+            (CombatFormulas.BaseCritMultiplierPercent + stats.Flat(StatId.CriticalMultiplier)) / 100.0;
+
+        /// <summary>Mana per use: (skill cost + flat) scaled by ManaCost increased/more, never negative.</summary>
+        public static double ManaCost(SkillDefinition skill, StatBlock stats) =>
+            System.Math.Max(0, (skill.ManaCost + stats.Flat(StatId.ManaCost)) * stats.ScalingMultiplier(StatId.ManaCost));
+
+        /// <summary>Steps 1-4. <paramref name="roll"/> supplies uniform values for base damage rolls.</summary>
+        private static DamageSet ScaledDamage(SkillDefinition skill, WeaponDefinition weapon, StatBlock stats, System.Func<double> roll)
+        {
             var damage = new DamageSet();
             double effectiveness = skill.DamageEffectiveness / 100.0;
 
             // 1. Base damage.
             if (skill.IsAttack)
             {
-                damage[DamageType.Physical] += Roll(weapon.PhysicalMin, weapon.PhysicalMax, rng) * effectiveness;
+                damage[DamageType.Physical] += Lerp(weapon.PhysicalMin, weapon.PhysicalMax, roll()) * effectiveness;
             }
             else
             {
                 foreach (var range in skill.BaseDamage)
                 {
-                    damage[range.Type] += Roll(range.Min, range.Max, rng);
+                    damage[range.Type] += Lerp(range.Min, range.Max, roll());
                 }
             }
 
@@ -97,20 +147,7 @@ namespace ChaosIdle.Simulation.Damage
                 }
             }
 
-            // 5. Critical strike. The roll is always consumed so RNG streams stay aligned across builds.
-            double baseCrit = skill.IsAttack ? weapon.CritChance : skill.BaseCritChance;
-            double critPercent = (baseCrit + stats.Flat(StatId.CriticalChance)) * stats.ScalingMultiplier(StatId.CriticalChance);
-            bool isCritical = rng.NextDouble() < CombatFormulas.PercentToChance(critPercent, CombatFormulas.MaxCritChance);
-            if (isCritical)
-            {
-                double multiplier = (CombatFormulas.BaseCritMultiplierPercent + stats.Flat(StatId.CriticalMultiplier)) / 100.0;
-                foreach (var type in DamageTypes.All)
-                {
-                    damage[type] *= multiplier;
-                }
-            }
-
-            return new OutgoingHit(damage, isCritical, skill.IsSpell);
+            return damage;
         }
 
         public static DamageSet RollEnemyHit(EnemyAttackDefinition attack, IRandom rng)
@@ -118,7 +155,7 @@ namespace ChaosIdle.Simulation.Damage
             var damage = new DamageSet();
             foreach (var range in attack.Damage)
             {
-                damage[range.Type] += Roll(range.Min, range.Max, rng);
+                damage[range.Type] += Lerp(range.Min, range.Max, rng.NextDouble());
             }
 
             return damage;
@@ -131,19 +168,17 @@ namespace ChaosIdle.Simulation.Damage
             double evadeRoll = rng.NextDouble();
             double blockRoll = rng.NextDouble();
 
-            if (!isSpell)
+            // 6. Evasion (attacks only).
+            if (!isSpell && evadeRoll >= CombatFormulas.HitChance(attackerAccuracy, defender.Evasion))
             {
-                // 6. Evasion (attacks only).
-                if (evadeRoll >= CombatFormulas.HitChance(attackerAccuracy, defender.Evasion))
-                {
-                    return new HitResult(HitOutcome.Evaded, incoming, new DamageSet(), 0, 0);
-                }
+                return new HitResult(HitOutcome.Evaded, incoming, new DamageSet(), 0, 0);
+            }
 
-                // 7. Block (attacks only): the hit is fully negated.
-                if (blockRoll < CombatFormulas.PercentToChance(defender.BlockChance, CombatFormulas.MaxBlockChance))
-                {
-                    return new HitResult(HitOutcome.Blocked, incoming, new DamageSet(), 0, 0);
-                }
+            // 7. Block (attacks; spells too if the defender has BlockSpells): the hit is fully negated.
+            if ((!isSpell || defender.BlockSpells)
+                && blockRoll < CombatFormulas.PercentToChance(defender.BlockChance, CombatFormulas.MaxBlockChance))
+            {
+                return new HitResult(HitOutcome.Blocked, incoming, new DamageSet(), 0, 0);
             }
 
             var taken = new DamageSet();
@@ -234,6 +269,6 @@ namespace ChaosIdle.Simulation.Damage
             return skill.CastTimeSeconds / stats.ScalingMultiplier(StatId.CastSpeed);
         }
 
-        private static double Roll(double min, double max, IRandom rng) => min + (max - min) * rng.NextDouble();
+        private static double Lerp(double min, double max, double t) => min + (max - min) * t;
     }
 }
