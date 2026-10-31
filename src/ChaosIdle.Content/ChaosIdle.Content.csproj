@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- netstandard2.1 + C# 9 so the assembly can be dropped into Unity unchanged. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <RootNamespace>ChaosIdle.Content</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../ChaosIdle.Domain/ChaosIdle.Domain.csproj" />
+  </ItemGroup>
+</Project>
