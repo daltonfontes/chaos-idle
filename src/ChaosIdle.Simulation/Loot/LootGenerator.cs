@@ -27,6 +27,12 @@ namespace ChaosIdle.Simulation.Loot
         public int RareMaxPerKind { get; init; } = 3;
     }
 
+    /// <summary>Map-driven loot bonuses, in percent.</summary>
+    public sealed record LootBonus(double QuantityPercent, double RarityPercent)
+    {
+        public static readonly LootBonus None = new LootBonus(0, 0);
+    }
+
     /// <summary>Data-driven, seeded item generation.</summary>
     public sealed class LootGenerator
     {
@@ -49,21 +55,29 @@ namespace ChaosIdle.Simulation.Loot
 
         public LootSettings Settings { get; }
 
-        public IReadOnlyList<Item> RollDrops(EnemyDefinition enemy, int areaLevel, IRandom rng)
+        /// <summary>
+        /// Guaranteed drops plus a chance-based extra. Quantity bonus scales the chance (above
+        /// 100% it adds whole drops); rarity bonus scales the magic/rare/unique weights.
+        /// Always consumes exactly one roll before generating items.
+        /// </summary>
+        public IReadOnlyList<Item> RollDrops(EnemyDefinition enemy, int areaLevel, IRandom rng, LootBonus? bonus = null)
         {
-            int count = enemy.GuaranteedDrops + (rng.NextDouble() < enemy.ItemDropChance ? 1 : 0);
+            bonus ??= LootBonus.None;
+            double chance = enemy.ItemDropChance * (1 + bonus.QuantityPercent / 100.0);
+            int whole = (int)Math.Floor(chance);
+            int count = enemy.GuaranteedDrops + whole + (rng.NextDouble() < chance - whole ? 1 : 0);
             var drops = new List<Item>(count);
             for (int i = 0; i < count; i++)
             {
-                drops.Add(Generate(areaLevel, enemy.IsBoss, rng));
+                drops.Add(Generate(areaLevel, enemy.IsBoss, rng, bonus.RarityPercent));
             }
 
             return drops;
         }
 
-        public Item Generate(int itemLevel, bool fromBoss, IRandom rng)
+        public Item Generate(int itemLevel, bool fromBoss, IRandom rng, double rarityPercent = 0)
         {
-            var rarity = RollRarity(fromBoss, rng);
+            var rarity = RollRarity(fromBoss, rng, rarityPercent);
             if (rarity == ItemRarity.Unique)
             {
                 var eligibleUniques = _uniques.Where(u => u.Base.DropLevel <= itemLevel).ToList();
@@ -92,12 +106,12 @@ namespace ChaosIdle.Simulation.Loot
             };
         }
 
-        public ItemRarity RollRarity(bool fromBoss, IRandom rng)
+        public ItemRarity RollRarity(bool fromBoss, IRandom rng, double rarityPercent = 0)
         {
-            int bonus = fromBoss ? Settings.BossRarityMultiplier : 1;
+            double bonus = (fromBoss ? Settings.BossRarityMultiplier : 1) * (1 + rarityPercent / 100.0);
             var table = new[]
             {
-                (Rarity: ItemRarity.Normal, Weight: Settings.NormalWeight),
+                (Rarity: ItemRarity.Normal, Weight: (double)Settings.NormalWeight),
                 (Rarity: ItemRarity.Magic, Weight: Settings.MagicWeight * bonus),
                 (Rarity: ItemRarity.Rare, Weight: Settings.RareWeight * bonus),
                 (Rarity: ItemRarity.Unique, Weight: _uniques.Count > 0 ? Settings.UniqueWeight * bonus : 0),
@@ -139,9 +153,12 @@ namespace ChaosIdle.Simulation.Loot
             return rolled.OrderBy(r => r.Affix.Kind).ThenBy(r => r.Affix.Id, StringComparer.Ordinal).ToList();
         }
 
-        private static T Pick<T>(IReadOnlyList<T> items, Func<T, int> weight, IRandom rng)
+        private static T Pick<T>(IReadOnlyList<T> items, Func<T, int> weight, IRandom rng) =>
+            Pick(items, x => (double)weight(x), rng);
+
+        private static T Pick<T>(IReadOnlyList<T> items, Func<T, double> weight, IRandom rng)
         {
-            int total = items.Sum(weight);
+            double total = items.Sum(weight);
             double roll = rng.NextDouble() * total;
             foreach (var item in items)
             {

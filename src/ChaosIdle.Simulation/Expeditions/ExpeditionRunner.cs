@@ -103,11 +103,23 @@ namespace ChaosIdle.Simulation.Expeditions
         /// Runs encounters in order until one fails. Pure: does not modify the character;
         /// call <see cref="ExpeditionReport.ClaimLoot"/> to collect rewards.
         /// </summary>
-        public ExpeditionReport Run(PlayerCharacter character, ExpeditionDefinition expedition, ulong seed, SimulationOptions? options = null)
+        public ExpeditionReport Run(PlayerCharacter character, ExpeditionDefinition expedition, ulong seed, SimulationOptions? options = null) =>
+            Run(character.ToBuild(), character.Id, expedition, seed, options, LootBonus.None);
+
+        /// <summary>Runs a map: its modifiers apply to enemies, to the player, and to loot.</summary>
+        public ExpeditionReport RunMap(CharacterBuild build, string characterId, ChaosIdle.Domain.Maps.MapInstance map, bool includeBoss, ulong seed, SimulationOptions? options = null)
+        {
+            var errors = map.Validate();
+            if (errors.Count > 0) throw new ArgumentException(string.Join("\n", errors));
+            return Run(map.ApplyTo(build), characterId, map.ToExpedition(includeBoss), seed, options,
+                new LootBonus(map.ItemQuantityPercent, map.ItemRarityPercent));
+        }
+
+        public ExpeditionReport Run(CharacterBuild build, string characterId, ExpeditionDefinition expedition, ulong seed,
+            SimulationOptions? options, LootBonus bonus)
         {
             if (expedition.Encounters.Count == 0) throw new ArgumentException($"{expedition.Id} has no encounters.");
 
-            var build = character.ToBuild();
             var results = new List<EncounterResult>();
             for (int i = 0; i < expedition.Encounters.Count; i++)
             {
@@ -118,14 +130,14 @@ namespace ChaosIdle.Simulation.Expeditions
                 var loot = new List<Item>();
                 for (int k = 0; k < combat.Kills.Count; k++)
                 {
-                    loot.AddRange(_loot.RollDrops(encounter.Enemies[k], expedition.AreaLevel, lootRng));
+                    loot.AddRange(_loot.RollDrops(encounter.Enemies[k], expedition.AreaLevel, lootRng, bonus));
                 }
 
                 results.Add(new EncounterResult(encounter, combat, loot));
                 if (combat.Outcome != CombatOutcome.Victory) break;
             }
 
-            return new ExpeditionReport(expedition, character.Id, seed, results, expedition.Encounters.Count);
+            return new ExpeditionReport(expedition, characterId, seed, results, expedition.Encounters.Count);
         }
     }
 }

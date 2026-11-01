@@ -18,6 +18,12 @@ automatic combat, and bounded offline expeditions.
     drawback, a loot filter with a build-aware preset, and scenario-based build comparison.
   - Gate: two equally invested builds are both viable, with opposite strengths. See
     [`docs/milestone-3.md`](docs/milestone-3.md).
+- **Milestone 4 — idle loop and progression:** the domain half is done.
+  - Done: 3 map tiers with bosses, 8 risk/reward map modifiers, tier unlocks through active
+    boss kills, and offline expeditions (capped, 60% efficient, packs only, claim-once)
+    with a "welcome back" report.
+  - Gate: a night away is rewarding while active play stays clearly better per hour. See
+    [`docs/milestone-4.md`](docs/milestone-4.md).
 
 ## Layout
 
@@ -26,7 +32,7 @@ automatic combat, and bounded offline expeditions.
 | `src/ChaosIdle.Domain` | Pure rules: stats and modifiers, combat formulas, skills, passive tree, items, equipment, inventory, characters, expeditions. |
 | `src/ChaosIdle.Simulation` | Deterministic random numbers, damage pipeline, combat simulator, failure analysis, loot generation, build summary and item comparison, expedition runner, player-facing report text. |
 | `src/ChaosIdle.Content` | Original content with stable IDs: class, skills, passive tree, item bases, affixes, monsters, encounters, expeditions, starter character. |
-| `src/ChaosIdle.Cli` | `compare` (the Milestone 1 build table), `expedition` (the Milestone 2 loop as text), and `builds` (the Milestone 3 reference-build comparison). |
+| `src/ChaosIdle.Cli` | `compare` (the Milestone 1 build table), `expedition` (the Milestone 2 loop as text), and `builds` (the Milestone 3 reference-build comparison), and `offline` (Milestone 4 offline sessions compared with active play). |
 | `tests/ChaosIdle.Tests` | xUnit tests: formulas, pipeline, simulator invariants, diagnosis, passives, items, loot, comparison, expeditions, and both milestone gates. |
 
 The library projects target `netstandard2.1` with C# 9, so Unity can use them unchanged later.
@@ -52,6 +58,10 @@ dotnet run --project src/ChaosIdle.Cli -- expedition 1 8  # seed, number of farm
 
 ```bash
 dotnet run --project src/ChaosIdle.Cli -- builds 100 1    # runs per scenario, first seed
+```
+
+```bash
+dotnet run --project src/ChaosIdle.Cli -- offline 10 1    # hours away, seed
 ```
 
 ## For Claude Code

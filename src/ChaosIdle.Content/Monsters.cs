@@ -103,6 +103,105 @@ namespace ChaosIdle.Content
             },
         };
 
-        public static readonly EnemyDefinition[] All = { RustHound, CinderWisp, BogBrute, AshWarden };
+        /// <summary>Cold caster: unblockable spells that punish low cold resistance.</summary>
+        public static readonly EnemyDefinition FrostboundSeer = new EnemyDefinition
+        {
+            Id = "monster.frostbound_seer",
+            Name = "Frostbound Seer",
+            MaxLife = 220,
+            ColdResistance = 40,
+            Accuracy = 450,
+            ActionTimeSeconds = 1.5,
+            ItemDropChance = 0.18,
+            Attacks = new[]
+            {
+                new EnemyAttackDefinition
+                {
+                    Id = "attack.frostbound_seer.rime_bolt", Name = "Rime Bolt", IsSpell = true,
+                    Damage = new[] { new DamageRange(DamageType.Cold, 30, 44) },
+                },
+            },
+        };
+
+        /// <summary>Very fast, evasive lightning attacker: many small hits.</summary>
+        public static readonly EnemyDefinition StormhideRunner = new EnemyDefinition
+        {
+            Id = "monster.stormhide_runner",
+            Name = "Stormhide Runner",
+            MaxLife = 200,
+            Evasion = 300,
+            LightningResistance = 30,
+            Accuracy = 500,
+            ActionTimeSeconds = 0.6,
+            ItemDropChance = 0.15,
+            Attacks = new[]
+            {
+                new EnemyAttackDefinition
+                {
+                    Id = "attack.stormhide_runner.static_rake", Name = "Static Rake",
+                    Damage = new[] { new DamageRange(DamageType.Lightning, 10, 18) },
+                },
+            },
+        };
+
+        /// <summary>Tier 1 boss: slow, armoured, telegraphed physical crushes.</summary>
+        public static readonly EnemyDefinition BogTyrant = new EnemyDefinition
+        {
+            Id = "boss.bog_tyrant",
+            Name = "The Bog Tyrant",
+            IsBoss = true,
+            MaxLife = 2500,
+            Armour = 500,
+            Accuracy = 450,
+            ActionTimeSeconds = 2.0,
+            GuaranteedDrops = 2,
+            Attacks = new[]
+            {
+                new EnemyAttackDefinition
+                {
+                    Id = "attack.bog_tyrant.mire_crush", Name = "Mire Crush", CooldownSeconds = 6,
+                    Damage = new[] { new DamageRange(DamageType.Physical, 70, 100) },
+                },
+                new EnemyAttackDefinition
+                {
+                    Id = "attack.bog_tyrant.sludge_swipe", Name = "Sludge Swipe",
+                    Damage = new[] { new DamageRange(DamageType.Physical, 30, 45) },
+                },
+            },
+        };
+
+        /// <summary>Tier 3 boss: cold spells and mixed cold/physical lashes.</summary>
+        public static readonly EnemyDefinition RimeheartMatron = new EnemyDefinition
+        {
+            Id = "boss.rimeheart_matron",
+            Name = "The Rimeheart Matron",
+            IsBoss = true,
+            MaxLife = 9000,
+            Armour = 300,
+            FireResistance = 20,
+            ColdResistance = 50,
+            LightningResistance = 20,
+            Accuracy = 700,
+            ActionTimeSeconds = 1.3,
+            GuaranteedDrops = 4,
+            Attacks = new[]
+            {
+                new EnemyAttackDefinition
+                {
+                    Id = "attack.rimeheart_matron.glacial_requiem", Name = "Glacial Requiem", IsSpell = true, CooldownSeconds = 7,
+                    Damage = new[] { new DamageRange(DamageType.Cold, 110, 150) },
+                },
+                new EnemyAttackDefinition
+                {
+                    Id = "attack.rimeheart_matron.frost_lash", Name = "Frost Lash",
+                    Damage = new[] { new DamageRange(DamageType.Cold, 35, 50), new DamageRange(DamageType.Physical, 20, 30) },
+                },
+            },
+        };
+
+        public static readonly EnemyDefinition[] All =
+        {
+            RustHound, CinderWisp, BogBrute, AshWarden, FrostboundSeer, StormhideRunner, BogTyrant, RimeheartMatron,
+        };
     }
 }
