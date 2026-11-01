@@ -8,5 +8,6 @@
     <ProjectReference Include="../ChaosIdle.Domain/ChaosIdle.Domain.csproj" />
     <ProjectReference Include="../ChaosIdle.Simulation/ChaosIdle.Simulation.csproj" />
     <ProjectReference Include="../ChaosIdle.Content/ChaosIdle.Content.csproj" />
+    <ProjectReference Include="../ChaosIdle.Persistence/ChaosIdle.Persistence.csproj" />
   </ItemGroup>
 </Project>

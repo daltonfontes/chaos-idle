@@ -24,6 +24,11 @@ automatic combat, and bounded offline expeditions.
     with a "welcome back" report.
   - Gate: a night away is rewarding while active play stays clearly better per hour. See
     [`docs/milestone-4.md`](docs/milestone-4.md).
+- **Milestone 5 — backend and beta:** in progress.
+  - Done: local save format. It's versioned JSON with a checksum, migrations, atomic writes
+    with a backup, forgiving loads when content changes, and an offline session that survives
+    a reload. See [`docs/save-format.md`](docs/save-format.md).
+  - Next: the server side (accounts, cloud saves, server-owned offline claims).
 
 ## Layout
 
@@ -32,7 +37,8 @@ automatic combat, and bounded offline expeditions.
 | `src/ChaosIdle.Domain` | Pure rules: stats and modifiers, combat formulas, skills, passive tree, items, equipment, inventory, characters, expeditions. |
 | `src/ChaosIdle.Simulation` | Deterministic random numbers, damage pipeline, combat simulator, failure analysis, loot generation, build summary and item comparison, expedition runner, player-facing report text. |
 | `src/ChaosIdle.Content` | Original content with stable IDs: class, skills, passive tree, item bases, affixes, monsters, encounters, expeditions, starter character. |
-| `src/ChaosIdle.Cli` | `compare` (the Milestone 1 build table), `expedition` (the Milestone 2 loop as text), and `builds` (the Milestone 3 reference-build comparison), and `offline` (Milestone 4 offline sessions compared with active play). |
+| `src/ChaosIdle.Persistence` | Versioned save format: save objects, mapping to and from the domain, checksummed JSON envelope, migrations, an atomic save store with a backup. |
+| `src/ChaosIdle.Cli` | `compare` (the Milestone 1 build table), `expedition` (the Milestone 2 loop as text), and `builds` (the Milestone 3 reference-build comparison), `offline` (Milestone 4 offline sessions compared with active play), and `save` (writes and reloads a save). |
 | `tests/ChaosIdle.Tests` | xUnit tests: formulas, pipeline, simulator invariants, diagnosis, passives, items, loot, comparison, expeditions, and both milestone gates. |
 
 The library projects target `netstandard2.1` with C# 9, so Unity can use them unchanged later.
@@ -62,6 +68,10 @@ dotnet run --project src/ChaosIdle.Cli -- builds 100 1    # runs per scenario, f
 
 ```bash
 dotnet run --project src/ChaosIdle.Cli -- offline 10 1    # hours away, seed
+```
+
+```bash
+dotnet run --project src/ChaosIdle.Cli -- save /tmp/saves # writes and reloads a save there
 ```
 
 ## For Claude Code
