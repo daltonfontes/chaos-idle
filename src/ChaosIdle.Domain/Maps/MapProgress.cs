@@ -13,6 +13,14 @@ namespace ChaosIdle.Domain.Maps
         public int HighestUnlockedTier { get; private set; } = 1;
         public IReadOnlyCollection<string> BossesDefeated => _bossesDefeated;
 
+        /// <summary>Rebuilds progress from a save.</summary>
+        public static MapProgress Restore(int highestUnlockedTier, IEnumerable<string> bossesDefeated)
+        {
+            var p = new MapProgress { HighestUnlockedTier = highestUnlockedTier < 1 ? 1 : highestUnlockedTier };
+            foreach (var id in bossesDefeated) p._bossesDefeated.Add(id);
+            return p;
+        }
+
         public bool CanRun(MapDefinition map) => map.Tier <= HighestUnlockedTier;
 
         /// <summary>Records an active boss kill. Returns true if it unlocked a new tier.</summary>

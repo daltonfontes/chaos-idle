@@ -93,6 +93,19 @@ namespace ChaosIdle.Domain.Characters
                 .ToDictionary(kv => kv.Key, kv => (IReadOnlyList<SupportDefinition>)kv.Value.ToArray()),
         };
 
+        /// <summary>
+        /// A copy of everything that defines the build (class, passives, gear, skills, supports),
+        /// with an empty bag. Later changes to this character do not affect the copy.
+        /// </summary>
+        public PlayerCharacter CloneLoadout()
+        {
+            var copy = new PlayerCharacter(Id, Name, Class, Passives, 1) { PrimarySkill = PrimarySkill };
+            copy.TriggeredSkills.AddRange(TriggeredSkills);
+            foreach (var kv in Equipment.Items) copy.Equipment.Equip(kv.Value, kv.Key);
+            foreach (var kv in _supports) copy._supports[kv.Key] = new List<SupportDefinition>(kv.Value);
+            return copy;
+        }
+
         /// <summary>Moves an item from the bag into a slot; the replaced item goes back into the bag.</summary>
         public EquipResult EquipFromInventory(Item item, EquipmentSlot slot)
         {

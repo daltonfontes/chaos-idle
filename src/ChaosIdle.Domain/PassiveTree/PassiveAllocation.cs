@@ -60,6 +60,37 @@ namespace ChaosIdle.Domain.PassiveTree
             return allocation;
         }
 
+        /// <summary>
+        /// Rebuilds an allocation from an unordered set (e.g. a save). Unknown nodes, nodes that
+        /// cannot be reached from the start through the set, and nodes beyond the point budget are
+        /// left out and returned in <paramref name="dropped"/> instead of failing the load.
+        /// </summary>
+        public static PassiveAllocation FromSet(PassiveTreeDefinition tree, int totalPoints, IEnumerable<string> nodeIds, out List<string> dropped)
+        {
+            var wanted = new List<string>(nodeIds.Where(id => id != tree.StartNodeId).Distinct());
+            dropped = wanted.Where(id => !tree.Contains(id)).ToList();
+            var pending = new List<string>(wanted.Where(tree.Contains));
+            var allocation = Empty(tree, totalPoints);
+
+            bool progress = true;
+            while (progress && pending.Count > 0)
+            {
+                progress = false;
+                foreach (var id in pending.ToList())
+                {
+                    if (allocation.CanAllocate(id) == AllocationError.None)
+                    {
+                        allocation = allocation.Allocate(id);
+                        pending.Remove(id);
+                        progress = true;
+                    }
+                }
+            }
+
+            dropped.AddRange(pending);
+            return allocation;
+        }
+
         public bool IsAllocated(string id) => _allocated.Contains(id);
 
         public AllocationError CanAllocate(string id)

@@ -39,6 +39,10 @@ namespace ChaosIdle.Domain.OfflineProgression
     {
         public string SessionId { get; init; } = "";
         public string CharacterId { get; init; } = "";
+
+        /// <summary>The character's loadout when the session started (saved with the session).</summary>
+        public PlayerCharacter? Loadout { get; init; }
+
         public CharacterBuild Build { get; init; } = new CharacterBuild();
         public MapInstance Map { get; init; } = new MapInstance();
         public DateTime StartedAtUtc { get; init; }
@@ -49,11 +53,13 @@ namespace ChaosIdle.Domain.OfflineProgression
             if (nowUtc.Kind != DateTimeKind.Utc) throw new ArgumentException("Use UTC times.", nameof(nowUtc));
             var errors = map.Validate();
             if (errors.Count > 0) throw new ArgumentException(string.Join("\n", errors));
+            var frozen = character.CloneLoadout();
             return new OfflineCheckpoint
             {
                 SessionId = sessionId,
                 CharacterId = character.Id,
-                Build = character.ToBuild(),
+                Loadout = frozen,
+                Build = frozen.ToBuild(),
                 Map = map,
                 StartedAtUtc = nowUtc,
                 Seed = seed,
