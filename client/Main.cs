@@ -204,7 +204,8 @@ public partial class Main : Control
     private void Show(IReadOnlyList<string> lines)
     {
         if (lines.Count == 0) return;
-        int firstLine = _log.GetLineCount();
+        // New text continues on the log's last (empty) line, so the report starts there.
+        int firstLine = System.Math.Max(0, _log.GetLineCount() - 1);
         _log.AppendText(string.Join("\n", lines) + "\n\n");
         Callable.From(() => _log.ScrollToLine(firstLine)).CallDeferred(); // after the label has re-laid out
     }
