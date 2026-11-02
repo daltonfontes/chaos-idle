@@ -129,6 +129,10 @@ public class GameSessionMapsLootTests : IDisposable
         Assert.Equal(FilterAction.Show, preview["unique-helm"].Action); // uniques are never below the minimum
         Assert.Equal(ItemRarity.Rare, s.LootFilter().MinimumRarity);
 
+        s.SetLootFilter(FilterPreset.Strict, ItemRarity.Magic, Now);
+        var rules = s.LootFilter().Rules;
+        Assert.Single(rules, r => r == "hide: Normal or worse"); // strict's own normal-item rule is not repeated
+
         s.SetLootFilter(FilterPreset.Strict, ItemRarity.Normal, Now);
         preview = s.FilterPreview().ToDictionary(r => r.ItemId);
         Assert.Equal(FilterAction.Hide, preview["normal-cap"].Action);

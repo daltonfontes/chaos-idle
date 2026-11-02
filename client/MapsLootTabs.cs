@@ -38,10 +38,6 @@ public partial class MapsTab : VBoxContainer
         _maps.ItemSelected += index => { _mapId = _maps.GetItemMetadata((int)index).AsString(); UpdatePreview(); };
         AddChild(_maps);
 
-        AddChild(new Label { Text = "Modifiers (up to 3): more danger, more loot" });
-        _modifiers = new VBoxContainer();
-        AddChild(_modifiers);
-
         _preview = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         AddChild(_preview);
 
@@ -66,6 +62,11 @@ public partial class MapsTab : VBoxContainer
         buttons.AddChild(_run);
         buttons.AddChild(_offline);
         AddChild(buttons);
+
+        AddChild(new Label { Text = "Modifiers (up to 3): more danger, more loot" });
+        _modifiers = new VBoxContainer();
+        AddChild(_modifiers);
+
     }
 
     public void Refresh()
@@ -76,10 +77,11 @@ public partial class MapsTab : VBoxContainer
         _maps.Clear();
         foreach (var m in session.Maps())
         {
-            string offline = m.IsOfflineMap ? " — offline farm" : "";
-            string text = m.Unlocked ? $"T{m.Tier} {m.Name} — boss: {m.BossName}{offline}" : $"T{m.Tier} {m.Name} — locked";
+            // Short enough for one line; the boss and details are in the preview.
+            string text = m.Unlocked ? $"T{m.Tier} {m.Name}" + (m.IsOfflineMap ? " (offline farm)" : "") : $"T{m.Tier} {m.Name} — locked";
             int i = _maps.AddItem(text);
             _maps.SetItemMetadata(i, m.Id);
+            _maps.SetItemTooltip(i, $"Boss: {m.BossName}, item level {m.AreaLevel}");
         }
 
         if (_checks.Count == 0)
@@ -95,7 +97,16 @@ public partial class MapsTab : VBoxContainer
         }
 
         _mapId ??= session.Maps().First(m => m.Unlocked).Id;
+        HighlightSelectedMap();
         UpdatePreview();
+    }
+
+    private void HighlightSelectedMap()
+    {
+        for (int i = 0; i < _maps.ItemCount; i++)
+        {
+            if (_maps.GetItemMetadata(i).AsString() == _mapId) _maps.Select(i);
+        }
     }
 
     /// <summary>Selects a map and modifiers (used by screenshots).</summary>
@@ -103,6 +114,7 @@ public partial class MapsTab : VBoxContainer
     {
         Refresh();
         _mapId = mapId;
+        HighlightSelectedMap();
         var wanted = new HashSet<string>(modifierIds);
         foreach (var (id, check) in _checks) check.SetPressedNoSignal(wanted.Contains(id));
         UpdatePreview();

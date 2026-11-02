@@ -57,9 +57,10 @@ namespace ChaosIdle.App
             {
                 var hideBelow = new LootFilterRule { Name = MinimumRarityRule, Action = FilterAction.Hide, MaxRarity = minimumRarity - 1 };
                 // After highlight rules (so a highlighted item still shows), before everything else.
+                // Plain "hide low rarity" rules that the new rule already covers are dropped, not repeated.
                 var rules = filter.Rules.Where(r => r.Action == FilterAction.Highlight)
                     .Append(hideBelow)
-                    .Concat(filter.Rules.Where(r => r.Action != FilterAction.Highlight))
+                    .Concat(filter.Rules.Where(r => r.Action != FilterAction.Highlight && !CoveredBy(r, minimumRarity)))
                     .ToList();
                 filter = filter with { Rules = rules };
             }
@@ -68,6 +69,10 @@ namespace ChaosIdle.App
             Save(nowUtc);
             return $"Loot filter: {State.LootFilter.Name}.";
         }
+
+        private static bool CoveredBy(LootFilterRule r, ItemRarity minimum) =>
+            r.Action == FilterAction.Hide && r.MaxRarity.HasValue && r.MaxRarity < minimum
+            && !r.MinRarity.HasValue && r.Classes.Count == 0 && r.MinItemLevel == 0 && r.WantedStats.Count == 0;
 
         /// <summary>What the current filter would do with each item in the bag.</summary>
         public IReadOnlyList<FilterPreviewRow> FilterPreview() =>
