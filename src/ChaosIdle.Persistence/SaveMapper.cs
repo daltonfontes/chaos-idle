@@ -42,7 +42,7 @@ namespace ChaosIdle.Persistence
                 BossesDefeated = state.Progress.BossesDefeated.OrderBy(x => x, StringComparer.Ordinal).ToList(),
             },
             LootFilter = ToSave(state.LootFilter),
-            Offline = state.Offline == null ? null : ToSave(state.Offline, state.Character),
+            Offline = state.Offline == null ? null : ToSave(state.Offline),
             ClaimedOfflineSessions = state.ClaimedSessions.ToList(),
         };
 
@@ -57,7 +57,7 @@ namespace ChaosIdle.Persistence
             OfflineCheckpoint? offline = null;
             if (save.Offline != null)
             {
-                offline = ToCheckpoint(save.Offline, save.Character, content, warnings);
+                offline = ToCheckpoint(save.Offline, save.Character.Id, save.Character.Name, content, warnings);
             }
 
             state.Restore(offline, save.ClaimedOfflineSessions);
@@ -111,7 +111,8 @@ namespace ChaosIdle.Persistence
             }).ToList(),
         };
 
-        private static OfflineSessionSave ToSave(OfflineCheckpoint cp, PlayerCharacter current) => new OfflineSessionSave
+        /// <summary>An offline session as stored data (used by saves and by the server).</summary>
+        public static OfflineSessionSave ToSave(OfflineCheckpoint cp) => new OfflineSessionSave
         {
             SessionId = cp.SessionId,
             MapId = cp.Map.Map.Id,
@@ -277,7 +278,8 @@ namespace ChaosIdle.Persistence
             };
         }
 
-        private static OfflineCheckpoint? ToCheckpoint(OfflineSessionSave s, CharacterSave owner, ContentRegistry content, List<string> warnings)
+        /// <summary>Rebuilds an offline session; null (with a warning) if its map is gone or its seed is invalid.</summary>
+        public static OfflineCheckpoint? ToCheckpoint(OfflineSessionSave s, string characterId, string characterName, ContentRegistry content, List<string> warnings)
         {
             var map = content.Map(s.MapId);
             if (map == null)
@@ -300,11 +302,11 @@ namespace ChaosIdle.Persistence
                 else modifiers.Add(m);
             }
 
-            var frozen = BuildCharacter(owner.Id, owner.Name, s.Loadout, 1, content, warnings);
+            var frozen = BuildCharacter(characterId, characterName, s.Loadout, 1, content, warnings);
             var checkpoint = new OfflineCheckpoint
             {
                 SessionId = s.SessionId,
-                CharacterId = owner.Id,
+                CharacterId = characterId,
                 Loadout = frozen,
                 Build = frozen.ToBuild(),
                 Map = new MapInstance { Map = map, Modifiers = modifiers },
