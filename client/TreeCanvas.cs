@@ -168,14 +168,20 @@ public partial class TreeCanvas : Control
 
             if (n.Kind == PassiveNodeKind.Keystone) DrawArc(p, r + 6, 0, Mathf.Tau, 40, n.State == PassiveState.Allocated ? Gold : Dim, 2, true);
             if (n.Id == _selected) DrawArc(p, r + 10, 0, Mathf.Tau, 40, Bright, 3, true);
+        }
 
-            bool named = n.Kind is PassiveNodeKind.Notable or PassiveNodeKind.Keystone or PassiveNodeKind.Start;
-            if (named && _zoom >= 0.45f)
-            {
-                int size = 18;
-                float width = font.GetStringSize(n.Name, HorizontalAlignment.Left, -1, size).X;
-                DrawString(font, p + new Vector2(-width / 2, r + 22), n.Name, HorizontalAlignment.Left, -1, size, n.State == PassiveState.Allocated ? Gold : Bright);
-            }
+        // Names last, outlined, so nodes and lines never cover them.
+        if (_zoom < 0.45f) return;
+        const int size = 18;
+        foreach (var n in _view.Nodes)
+        {
+            if (n.Kind is not (PassiveNodeKind.Notable or PassiveNodeKind.Keystone or PassiveNodeKind.Start)) continue;
+            var p = Screen(n);
+            if (p.X < -120 || p.Y < -60 || p.X > Size.X + 120 || p.Y > Size.Y + 60) continue;
+            float width = font.GetStringSize(n.Name, HorizontalAlignment.Left, -1, size).X;
+            var at = p + new Vector2(-width / 2, Radius(n.Kind) + 24);
+            DrawStringOutline(font, at, n.Name, HorizontalAlignment.Left, -1, size, 6, Background);
+            DrawString(font, at, n.Name, HorizontalAlignment.Left, -1, size, n.State == PassiveState.Allocated ? Gold : Bright);
         }
     }
 
