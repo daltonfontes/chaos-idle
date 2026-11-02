@@ -207,8 +207,9 @@ public partial class SkillsTab : VBoxContainer
         _skills.Clear();
         foreach (var s in skills)
         {
-            string linked = s.Linked.Count == 0 ? "no supports" : string.Join(", ", s.Linked.Select(l => l.Name));
-            int index = _skills.AddItem($"{s.Name} [{s.Kind}] — {linked} — {s.FreeSockets} free socket(s)");
+            // Short enough for one line on a phone; the linked supports show in the list below.
+            int index = _skills.AddItem($"{s.Name} — {s.Linked.Count} linked, {s.FreeSockets} free");
+            _skills.SetItemTooltip(index, $"{s.Name} [{s.Kind}]: " + (s.Linked.Count == 0 ? "no supports" : string.Join(", ", s.Linked.Select(l => l.Name))));
             _skills.SetItemMetadata(index, s.Id);
         }
 

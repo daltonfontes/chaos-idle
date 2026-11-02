@@ -101,7 +101,7 @@ public partial class Main : Control
         _maps = new HFlowContainer();
         column.AddChild(_maps);
 
-        _log = new RichTextLabel { ScrollFollowing = true, SizeFlagsVertical = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(0, 360) };
+        _log = new RichTextLabel { ScrollFollowing = false, SizeFlagsVertical = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(0, 360) };
         column.AddChild(_log);
 
         column.AddChild(new Label { Text = "Bag" });
@@ -200,9 +200,13 @@ public partial class Main : Control
         Refresh();
     }
 
+    /// <summary>Appends a report and scrolls so it is read from its first line.</summary>
     private void Show(IReadOnlyList<string> lines)
     {
         if (lines.Count == 0) return;
+        // New text continues on the log's last (empty) line, so the report starts there.
+        int firstLine = System.Math.Max(0, _log.GetLineCount() - 1);
         _log.AppendText(string.Join("\n", lines) + "\n\n");
+        Callable.From(() => _log.ScrollToLine(firstLine)).CallDeferred(); // after the label has re-laid out
     }
 }

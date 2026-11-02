@@ -102,8 +102,8 @@ namespace ChaosIdle.App
                 return new PassivePath(nodeId, Array.Empty<string>(), false, lines);
             }
 
-            lines.Add(cost == 1 ? "1 point: right next to your passives." : $"{cost} points along the shortest path.");
-            if (error != AllocationError.None) lines.Add(LockedReason(a, nodeId, error));
+            if (error == AllocationError.None) lines.Add(cost == 1 ? "1 point: right next to your passives." : $"{cost} points along the shortest path.");
+            else lines.Add(LockedReason(a, nodeId, error));
             var after = error == AllocationError.None ? a.AllocatePath(nodeId) : PassiveAllocation.FromPath(Unlimited(a), path.ToArray());
             lines.Add(error == AllocationError.None ? "If you take the path:" : "With enough points, the path would give:");
             lines.AddRange(DiffLines(Character.ToBuild(), WithPassives(after)));
