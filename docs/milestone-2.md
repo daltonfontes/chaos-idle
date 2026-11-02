@@ -17,10 +17,8 @@ Milestone 2 has two halves:
 - `PassiveAllocation` is immutable. Allocating a node requires an adjacent allocated node
   and a free point. Refunding is refused if it would cut other nodes off from the start.
   Each refusal has a typed reason (`AllocationError`) that the UI can show.
-- The Guardian tree has 26 nodes in four branches: defence, melee, spell, and wards.
-- It has two keystones, each changing a rule at a real cost:
-  - **Unyielding Bastion**: block also applies to spells, but you have 20% less maximum life.
-  - **Overcharge**: 40% more spell damage, but skills cost 50% more mana.
+- *Since replaced (see `docs/passive-tree.md`):* the first tree had 26 nodes for the
+  Guardian only. It is now a shared tree for all classes.
 
 ### Items — `Domain/Items`, `Content/ItemBases.cs`, `Content/Affixes.cs`
 - 13 bases across 8 item classes and 8 equipment slots. Rings fit either ring slot.

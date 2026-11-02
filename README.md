@@ -11,6 +11,7 @@ automatic combat, and bounded offline expeditions.
   - Done: passive tree, items and affixes, loot, inventory, item comparison, expeditions,
     and player-facing reports.
   - Client: a Godot 4 (.NET) app in `client/`, see [`docs/client.md`](docs/client.md).
+  - Passive tree: one shared, drawn tree for all classes, see [`docs/passive-tree.md`](docs/passive-tree.md).
 
   See [`docs/milestone-2.md`](docs/milestone-2.md).
 - **Milestone 3 — buildcraft:** the domain half is done.

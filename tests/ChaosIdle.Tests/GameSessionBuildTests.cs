@@ -19,44 +19,67 @@ public class GameSessionBuildTests : IDisposable
     private GameSession Open() => GameSession.LoadOrCreate(_dir, Now, () => _seed++);
 
     [Fact]
-    public void Tree_view_shows_every_node_with_its_state_and_reason()
+    public void Tree_view_shows_every_node_with_its_state_position_and_reason()
     {
         var view = Open().PassiveTree();
 
-        Assert.Equal(PassiveTrees.Guardian.Nodes.Count, view.Nodes.Count);
+        Assert.Equal(PassiveTrees.World.Nodes.Count, view.Nodes.Count);
+        Assert.Equal(PassiveTrees.World.Links.Count, view.Links.Count);
         Assert.Equal(StarterCharacters.StartingPassivePoints, view.PointsSpent);
         Assert.Equal(0, view.PointsRemaining);
         Assert.Equal("Start", view.Nodes[0].Branch);
+        Assert.True(view.Nodes.Single(n => n.Id == "pas.start.guardian").IsOwnStart);
 
-        var frame = view.Nodes.Single(n => n.Id == "pas.def.frame1");
-        Assert.Equal(PassiveState.Allocated, frame.State);
-        Assert.Contains("depend on it", frame.Reason);
+        Assert.Contains("depend on it", view.Nodes.Single(n => n.Id == "pas.spoke.210").Reason);
+        var far = view.Nodes.Single(n => n.Id == PassiveTrees.Minor("spellcraft", 1));
+        Assert.Equal(PassiveState.Locked, far.State);
+        Assert.Contains("points away", far.Reason);
+        Assert.Contains("refund", far.Reason);
+        Assert.Equal("Another class begins here.", view.Nodes.Single(n => n.Id == "pas.start.hunter").Reason);
 
-        var kindling = view.Nodes.Single(n => n.Id == "pas.spl.kindling");
-        Assert.Equal(PassiveState.Locked, kindling.State);
-        Assert.Contains("No passive points left", kindling.Reason);
-
-        var focus = view.Nodes.Single(n => n.Id == "pas.spl.focus");
-        Assert.Contains("No passive points", focus.Reason); // points are checked before connection
-        Assert.All(view.Nodes, n => Assert.False(string.IsNullOrWhiteSpace(n.Reason)));
         Assert.Equal("Keystones", view.Nodes.Single(n => n.Id == "pas.key.bastion").Branch);
+        Assert.Equal("Vitality", view.Nodes.Single(n => n.Id == PassiveTrees.Notable("vitality")).Branch);
+        Assert.Equal("Roads", view.Nodes.Single(n => n.Id == "pas.ring.210").Branch);
+        Assert.All(view.Nodes, n => Assert.False(string.IsNullOrWhiteSpace(n.Reason)));
+        Assert.Contains(view.Nodes, n => n.X != 0 || n.Y != 0);
     }
 
     [Fact]
-    public void Refund_then_allocate_elsewhere_and_it_is_saved()
+    public void Refund_then_allocate_single_nodes_and_it_is_saved()
     {
         var s = Open();
-        Assert.Contains("Other passives depend on it", s.RefundPassive("pas.def.frame1", Now));
-        Assert.StartsWith("Refunded Emberward. 1 point(s) left.", s.RefundPassive("pas.wrd.ember", Now));
-
-        var view = s.PassiveTree();
-        Assert.Equal(PassiveState.Available, view.Nodes.Single(n => n.Id == "pas.spl.kindling").State);
-        Assert.Contains("Not connected", s.AllocatePassive("pas.spl.focus", Now));
-        Assert.StartsWith("Took Kindling. 0 point(s) left.", s.AllocatePassive("pas.spl.kindling", Now));
+        Assert.Contains("Other passives depend on it", s.RefundPassive("pas.spoke.210", Now));
+        Assert.Equal("Refunded Heavy Hands. 1 point(s) left.", s.RefundPassive(PassiveTrees.Minor("iron", 4), Now));
+        Assert.Equal("Refunded Vigour. 2 point(s) left.", s.RefundPassive("pas.bridge.255", Now));
+        Assert.Contains("points away", s.AllocatePassive(PassiveTrees.Notable("iron"), Now));
+        Assert.Equal("Took Vigour. 1 point(s) left.", s.AllocatePassive("pas.ring.180", Now));
 
         var reloaded = Open();
-        Assert.True(reloaded.Character.Passives.IsAllocated("pas.spl.kindling"));
-        Assert.False(reloaded.Character.Passives.IsAllocated("pas.wrd.ember"));
+        Assert.True(reloaded.Character.Passives.IsAllocated("pas.ring.180"));
+        Assert.False(reloaded.Character.Passives.IsAllocated(PassiveTrees.Minor("iron", 4)));
+    }
+
+    [Fact]
+    public void Paths_to_far_nodes_are_previewed_priced_and_taken_at_once()
+    {
+        var s = Open();
+        s.RefundPassive(PassiveTrees.Minor("iron", 4), Now);
+        s.RefundPassive("pas.bridge.255", Now); // 2 points free
+
+        var tooFar = s.PreviewPath(PassiveTrees.Notable("iron"));
+        Assert.False(tooFar.CanTake);
+        Assert.Equal(3, tooFar.NodeIds.Count);
+        Assert.Contains(tooFar.Lines, l => l.StartsWith("3 points"));
+        Assert.Contains(tooFar.Lines, l => l.Contains("refund some passives first"));
+        Assert.Contains(tooFar.Lines, l => l.Contains("Armour") && l.Contains("▲ better"));
+        Assert.Contains("refund some passives first", s.AllocatePath(PassiveTrees.Notable("iron"), Now));
+
+        Assert.StartsWith("Refunded", s.RefundPassive(PassiveTrees.Minor("bulwark", 3), Now)); // 3 points free
+        Assert.True(s.PreviewPath(PassiveTrees.Notable("iron")).CanTake);
+        Assert.Equal("Took Ironclad (3 points). 0 point(s) left.", s.AllocatePath(PassiveTrees.Notable("iron"), Now));
+        Assert.True(Open().Character.Passives.IsAllocated(PassiveTrees.Notable("iron")));
+
+        Assert.Contains(s.PreviewPath("pas.start.arcanist").Lines, l => l.Contains("Another class begins here"));
     }
 
     [Fact]
@@ -64,15 +87,14 @@ public class GameSessionBuildTests : IDisposable
     {
         var s = Open();
         var before = s.Character.Passives;
-        var lines = s.PreviewPassive("pas.wrd.ember");
+        var lines = s.PreviewPassive(PassiveTrees.Minor("iron", 4));
 
-        Assert.Equal("Emberward (Minor)", lines[0]);
+        Assert.Equal("Heavy Hands (Minor)", lines[0]);
         Assert.Contains("If you refund it:", lines);
-        Assert.Contains(lines, l => l.Contains("▼ worse") && l.Contains("Fire resistance"));
+        Assert.Contains(lines, l => l.Contains("▼ worse") && l.Contains("Damage per second"));
         Assert.Same(before, s.Character.Passives);
-
-        Assert.Contains(s.PreviewPassive("pas.spl.focus"), l => l.Contains("No passive points left"));
         Assert.Throws<ArgumentException>(() => s.PreviewPassive("pas.nope"));
+        Assert.Throws<ArgumentException>(() => s.PreviewPath("pas.nope"));
     }
 
     [Fact]

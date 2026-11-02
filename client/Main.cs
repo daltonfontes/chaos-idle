@@ -90,7 +90,7 @@ public partial class Main : Control
         // The build tabs share the session; any change there refreshes the sheet and bag here.
         _passives = new PassivesTab(() => _session, Refresh);
         _skillsTab = new SkillsTab(() => _session, Refresh);
-        tabs.AddChild(Scrolling(_passives));
+        tabs.AddChild(_passives); // not in a ScrollContainer: dragging pans the tree instead of scrolling
         tabs.AddChild(Scrolling(_skillsTab));
         tabs.TabChanged += _ => { _passives.Refresh(); _skillsTab.Refresh(); };
 

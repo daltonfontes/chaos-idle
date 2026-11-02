@@ -13,7 +13,8 @@ Godot because:
 |---|---|
 | `src/ChaosIdle.App` (`GameSession`) | Everything the screens do, with no Godot types: load or create the save, the character sheet, expeditions (active, boss included, tier unlocks), the bag (describe and compare, equip, discard), and local offline progress on pause/resume. Unit-tested in `GameSessionTests`. |
 | `client/Main.cs` + `Main.tscn` | The main screen, built in code (portrait 720×1280, larger font), with three tabs. **Adventure:** character sheet, maps, report, bag. **Passives** and **Skills:** `client/BuildTabs.cs`. |
-| `client/BuildTabs.cs` | **Passives:** the tree as a list grouped by branch, with text markers (● taken, ○ available, · locked, ★ keystone); tapping a node previews what taking or refunding it changes, or says why it can't. **Skills:** choose the main skill, see each skill's supports and free sockets; tapping a support previews its effect or explains why it doesn't fit. |
+| `client/TreeCanvas.cs` | Draws the shared passive tree: drag to move, pinch / mouse wheel / − + buttons to zoom. Filled = taken, thick ring = available, blue = the selected path, X = another class's start, double ring = keystone. |
+| `client/BuildTabs.cs` | **Passives:** the drawn tree; tapping any node shows the shortest path to it, its cost and the combined character-sheet change, with "Take path (N points)" and "Refund". **Skills:** choose the main skill, see each skill's supports and free sockets; tapping a support previews its effect or explains why it doesn't fit. |
 | `client/Screenshots.cs` + `Screenshots.tscn` | CI only: opens the real main screen, plays an expedition, and saves a PNG of each tab. |
 | `client/Smoke.cs` + `Smoke.tscn` | A headless check run by CI **inside the Godot runtime**: new game, an expedition, background the app, relaunch, come back three hours later with offline loot. |
 | `client/export_presets.cfg` | The Android preset: arm64, debug-signed, package `com.chaosidle.game`. |
@@ -56,9 +57,7 @@ release.
 
 ## Next steps
 
-- Show map modifiers, uniques' details and the loot filter on screen (the passive tree and
-  supports are shown since the Passives and Skills tabs). A visual graph of the tree could
-  replace the list later.
+- Show map modifiers, uniques' details and the loot filter on screen.
 - Combat visuals by replaying a finished `CombatReport`, so visuals can't change outcomes.
   This needs a per-event timeline added to the report.
 - Sign-in and cloud saves against the server.

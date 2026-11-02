@@ -24,7 +24,7 @@ internal static class ExpeditionCommand
 
         var runner = new ExpeditionRunner(new LootGenerator(ItemBases.All, Affixes.All, uniques: Uniques.All));
         var guardian = StarterCharacters.NewGuardian();
-        guardian.Passives = PassiveAllocation.FromPath(PassiveTrees.Guardian, StarterCharacters.StartingPassivePoints, StarterCharacters.BulwarkPath);
+        guardian.Passives = StarterCharacters.StarterPassives();
 
         Section("Character");
         PrintSheet(guardian);

@@ -7,6 +7,7 @@ namespace ChaosIdle.Domain.PassiveTree
 {
     public enum PassiveNodeKind
     {
+        /// <summary>A class's starting point (free, owned by <see cref="PassiveNode.ClassId"/>).</summary>
         Start = 0,
         Minor = 1,
         Notable = 2,
@@ -22,22 +23,34 @@ namespace ChaosIdle.Domain.PassiveTree
         public string Description { get; init; } = "";
         public PassiveNodeKind Kind { get; init; } = PassiveNodeKind.Minor;
         public IReadOnlyList<Modifier> Modifiers { get; init; } = Array.Empty<Modifier>();
+
+        /// <summary>Layout position for drawing the tree (arbitrary units, origin at the centre).</summary>
+        public double X { get; init; }
+        public double Y { get; init; }
+
+        /// <summary>Start nodes only: the class that begins here.</summary>
+        public string? ClassId { get; init; }
     }
 
-    /// <summary>An undirected graph of passive nodes rooted at a single start node.</summary>
+    /// <summary>
+    /// An undirected graph of passive nodes shared by all classes. Each class begins at its own
+    /// start node; other classes' start nodes can never be allocated or walked through.
+    /// </summary>
     public sealed class PassiveTreeDefinition
     {
         private readonly Dictionary<string, PassiveNode> _nodes;
+        private readonly List<PassiveNode> _ordered;
         private readonly Dictionary<string, List<string>> _adjacency;
+        private readonly List<(string A, string B)> _links = new List<(string, string)>();
 
         public PassiveTreeDefinition(string id, IEnumerable<PassiveNode> nodes, IEnumerable<(string A, string B)> links)
         {
             Id = id;
-            var nodeList = nodes.ToList();
+            _ordered = nodes.ToList();
             var errors = new List<string>();
 
             _nodes = new Dictionary<string, PassiveNode>();
-            foreach (var n in nodeList)
+            foreach (var n in _ordered)
             {
                 if (_nodes.ContainsKey(n.Id)) errors.Add($"Duplicate passive node id {n.Id}.");
                 _nodes[n.Id] = n;
@@ -53,20 +66,28 @@ namespace ChaosIdle.Domain.PassiveTree
                 }
 
                 if (a == b) errors.Add($"Node {a} links to itself.");
-                if (!_adjacency[a].Contains(b)) _adjacency[a].Add(b);
-                if (!_adjacency[b].Contains(a)) _adjacency[b].Add(a);
+                if (_adjacency[a].Contains(b)) continue;
+                _adjacency[a].Add(b);
+                _adjacency[b].Add(a);
+                _links.Add((a, b));
             }
 
-            var starts = nodeList.Where(n => n.Kind == PassiveNodeKind.Start).ToList();
-            if (starts.Count != 1) errors.Add($"Tree {id} must have exactly one start node; found {starts.Count}.");
+            StartNodes = _ordered.Where(n => n.Kind == PassiveNodeKind.Start).ToList();
+            if (StartNodes.Count == 0) errors.Add($"Tree {id} has no start node.");
+            if (StartNodes.Count > 1)
+            {
+                if (StartNodes.Any(s => string.IsNullOrWhiteSpace(s.ClassId)))
+                    errors.Add($"Tree {id} has several start nodes; each needs a ClassId.");
+                foreach (var dup in StartNodes.GroupBy(s => s.ClassId).Where(g => g.Count() > 1))
+                    errors.Add($"Class {dup.Key} has more than one start node.");
+            }
 
             if (errors.Count == 0)
             {
-                StartNodeId = starts[0].Id;
-                var reachable = Reachable(new HashSet<string>(_nodes.Keys), StartNodeId);
+                var reachable = Reachable(new HashSet<string>(_nodes.Keys), StartNodes[0].Id);
                 foreach (var orphan in _nodes.Keys.Where(k => !reachable.Contains(k)))
                 {
-                    errors.Add($"Node {orphan} is not connected to the start.");
+                    errors.Add($"Node {orphan} is not connected to the rest of the tree.");
                 }
             }
 
@@ -77,14 +98,31 @@ namespace ChaosIdle.Domain.PassiveTree
         }
 
         public string Id { get; }
-        public string StartNodeId { get; } = "";
-        public IReadOnlyCollection<PassiveNode> Nodes => _nodes.Values;
+
+        /// <summary>All nodes, in definition order.</summary>
+        public IReadOnlyList<PassiveNode> Nodes => _ordered;
+
+        /// <summary>Every connection once, for drawing.</summary>
+        public IReadOnlyList<(string A, string B)> Links => _links;
+
+        public IReadOnlyList<PassiveNode> StartNodes { get; }
 
         public PassiveNode this[string id] => _nodes[id];
 
         public bool Contains(string id) => _nodes.ContainsKey(id);
 
         public IReadOnlyList<string> Neighbours(string id) => _adjacency[id];
+
+        /// <summary>The start node of a class, or the only start node of a single-start tree.</summary>
+        public string StartNodeFor(string? classId)
+        {
+            if (StartNodes.Count == 1 && (classId == null || StartNodes[0].ClassId == null || StartNodes[0].ClassId == classId))
+                return StartNodes[0].Id;
+            return StartNodes.FirstOrDefault(s => s.ClassId == classId)?.Id
+                   ?? throw new ArgumentException($"Tree {Id} has no start node for class {classId}.");
+        }
+
+        public bool IsStart(string id) => _nodes.TryGetValue(id, out var n) && n.Kind == PassiveNodeKind.Start;
 
         /// <summary>Nodes reachable from <paramref name="from"/> moving only through <paramref name="within"/>.</summary>
         internal HashSet<string> Reachable(ISet<string> within, string from)

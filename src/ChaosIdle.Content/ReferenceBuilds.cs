@@ -20,10 +20,9 @@ namespace ChaosIdle.Content
         public static PlayerCharacter IronBastion()
         {
             var c = Create("ref.iron_bastion", "Iron Bastion",
-                "pas.def.frame1", "pas.def.guard1", "pas.def.guard2", "pas.def.shieldwall",
-                "pas.def.skin1", "pas.def.skin2", "pas.def.frame2", "pas.def.unbroken",
-                "pas.mel.hands1", "pas.mel.swing", "pas.mel.hands2", "pas.mel.answer", "pas.mel.eye",
-                "pas.wrd.ember", "pas.wrd.frost", "pas.wrd.storm", "pas.wrd.soul", "pas.spl.kindling");
+                PassiveTrees.Notable("bulwark"), PassiveTrees.Notable("vitality"), PassiveTrees.Notable("iron"),
+                PassiveTrees.Minor("bulwark", 3), PassiveTrees.Minor("iron", 3), PassiveTrees.Minor("iron", 4),
+                PassiveTrees.Minor("bloodletting", 4), PassiveTrees.Minor("vitality", 3));
 
             c.PrimarySkill = Skills.IronCleave;
             c.TriggeredSkills.Add(Skills.BulwarkRetort);
@@ -45,9 +44,7 @@ namespace ChaosIdle.Content
         public static PlayerCharacter EmberLancer()
         {
             var c = Create("ref.ember_lancer", "Ember Lancer",
-                "pas.spl.kindling", "pas.spl.hearth", "pas.spl.well", "pas.spl.words", "pas.spl.pyremind", "pas.spl.focus", "pas.key.overcharge",
-                "pas.wrd.ember", "pas.wrd.frost", "pas.wrd.storm", "pas.wrd.soul",
-                "pas.def.frame1", "pas.def.skin1", "pas.def.frame2", "pas.def.unbroken", "pas.def.guard1", "pas.def.guard2", "pas.def.shieldwall");
+                PassiveTrees.Notable("vitality"), PassiveTrees.Notable("hearth"), "pas.key.overcharge");
 
             c.PrimarySkill = Skills.CinderLance;
             Link(c, Skills.CinderLance, Supports.FocusedIntent, Supports.KeenEdge, Supports.SunderingFocus);
@@ -63,12 +60,10 @@ namespace ChaosIdle.Content
             return c;
         }
 
-        private static PlayerCharacter Create(string id, string name, params string[] passives)
-        {
-            var c = new PlayerCharacter(id, name, Classes.Guardian,
-                PassiveAllocation.FromPath(PassiveTrees.Guardian, PassivePoints, passives), StarterCharacters.InventoryCapacity);
-            return c;
-        }
+        /// <summary>Passives are given as targets; the shortest paths to them are taken in order.</summary>
+        private static PlayerCharacter Create(string id, string name, params string[] targets) =>
+            new PlayerCharacter(id, name, Classes.Guardian,
+                PassiveAllocation.FromTargets(StarterCharacters.EmptyPassives(PassivePoints), targets), StarterCharacters.InventoryCapacity);
 
         private static void Link(PlayerCharacter c, Domain.Skills.SkillDefinition skill, params Domain.Skills.SupportDefinition[] supports)
         {

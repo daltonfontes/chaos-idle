@@ -9,6 +9,7 @@ namespace ChaosIdle.Content
         {
             Id = "class.guardian",
             Name = "Guardian",
+            PassiveTreeId = PassiveTrees.WorldId,
             BaseModifiers = new[]
             {
                 new Modifier(StatId.MaxLife, ModifierKind.Flat, 400, "class.guardian"),

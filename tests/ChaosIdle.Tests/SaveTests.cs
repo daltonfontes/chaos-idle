@@ -182,7 +182,7 @@ public class SaveTests
         var trimmed = new ContentRegistry(
             new[] { Classes.Guardian }, Skills.All, Supports.All.Where(s => s != Supports.Siphon),
             ItemBases.All.Where(b => b != ItemBases.IronBand), Affixes.All.Where(a => a.Id != "affix.crit_multi"),
-            Uniques.All.Where(u => u != Uniques.KindledOath), new[] { PassiveTrees.Guardian }, Maps.All, MapModifiers.All.Where(m => m != MapModifiers.Savage));
+            Uniques.All.Where(u => u != Uniques.KindledOath), new[] { PassiveTrees.World }, Maps.All, MapModifiers.All.Where(m => m != MapModifiers.Savage));
 
         var loaded = SaveMapper.FromSave(data, trimmed);
 
@@ -208,24 +208,38 @@ public class SaveTests
     [Fact]
     public void Unreachable_passives_are_refunded_on_load()
     {
-        var data = SaveMapper.ToSave(RichState());
-        data.Character.Loadout.AllocatedPassives.Remove("pas.def.frame1"); // the gateway to the defence branch
+        var state = RichState();
+        var passives = state.Character.Passives;
+        // Any node whose removal would cut others off from the start.
+        string cut = passives.Allocated.First(id => passives.CanRefund(id) == ChaosIdle.Domain.PassiveTree.AllocationError.WouldDisconnect);
+        var data = SaveMapper.ToSave(state);
+        data.Character.Loadout.AllocatedPassives.Remove(cut);
         data.Character.Loadout.AllocatedPassives.Add("pas.unknown");
 
         var loaded = SaveMapper.FromSave(data, ContentDatabase.Default);
-        var passives = loaded.State.Character.Passives;
+        var restored = loaded.State.Character.Passives;
+        var lost = passives.Allocated.Where(id => id != cut && !restored.IsAllocated(id)).ToList();
 
-        // The armour cluster only connects through frame1; the block nodes stay reachable through the melee branch.
-        foreach (var cut in new[] { "pas.def.skin1", "pas.def.skin2", "pas.def.frame2", "pas.def.unbroken" })
-        {
-            Assert.False(passives.IsAllocated(cut));
-            Assert.Contains(loaded.Warnings, w => w.Contains(cut));
-        }
-
-        Assert.True(passives.IsAllocated("pas.def.shieldwall"));
+        Assert.NotEmpty(lost);
+        Assert.All(lost, id => Assert.Contains(loaded.Warnings, w => w.Contains(id)));
         Assert.Contains(loaded.Warnings, w => w.Contains("pas.unknown"));
-        Assert.All(passives.Allocated, id => Assert.True(PassiveTrees.Guardian.Contains(id)));
-        Assert.True(passives.PointsRemaining > 0);
+        Assert.Equal(restored.Allocated.Count, restored.Allocated.Count(id => PassiveTrees.World.Contains(id)));
+        Assert.Equal(passives.PointsSpent - 1 - lost.Count, restored.PointsSpent);
+    }
+
+    [Fact]
+    public void Saves_from_the_old_passive_tree_refund_every_point()
+    {
+        var data = SaveMapper.ToSave(RichState());
+        data.Character.Loadout.PassiveTreeId = "tree.guardian"; // the tree before the redesign
+        data.Character.Loadout.AllocatedPassives = new List<string> { "pas.def.frame1", "pas.mel.hands1" };
+
+        var loaded = SaveMapper.FromSave(data, ContentDatabase.Default);
+
+        Assert.Equal(PassiveTrees.WorldId, loaded.State.Character.Passives.Tree.Id);
+        Assert.Equal(0, loaded.State.Character.Passives.PointsSpent);
+        Assert.Equal(data.Character.Loadout.PassivePoints, loaded.State.Character.Passives.PointsRemaining);
+        Assert.Contains(loaded.Warnings, w => w.Contains("redesigned"));
     }
 
     [Fact]
@@ -233,7 +247,7 @@ public class SaveTests
     {
         Assert.Throws<ArgumentException>(() => new ContentRegistry(
             new[] { Classes.Guardian }, Skills.All.Append(Skills.IronCleave), Supports.All, ItemBases.All, Affixes.All,
-            Uniques.All, new[] { PassiveTrees.Guardian }, Maps.All, MapModifiers.All));
+            Uniques.All, new[] { PassiveTrees.World }, Maps.All, MapModifiers.All));
         Assert.NotNull(ContentDatabase.Default.Affix("unique.stillwater_helm.cost"));
     }
 

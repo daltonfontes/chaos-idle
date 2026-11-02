@@ -12,7 +12,7 @@ namespace ChaosIdle.Content
             ItemBases.All,
             Affixes.All,
             Uniques.All,
-            new[] { PassiveTrees.Guardian },
+            new[] { PassiveTrees.World },
             Maps.All,
             MapModifiers.All);
     }

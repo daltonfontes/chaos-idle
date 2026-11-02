@@ -107,7 +107,7 @@ public class Milestone2GateTests
     private static ChaosIdle.Domain.Characters.PlayerCharacter Starter()
     {
         var c = StarterCharacters.NewGuardian();
-        c.Passives = PassiveAllocation.FromPath(PassiveTrees.Guardian, StarterCharacters.StartingPassivePoints, StarterCharacters.BulwarkPath);
+        c.Passives = StarterCharacters.StarterPassives();
         return c;
     }
 
@@ -116,6 +116,17 @@ public class Milestone2GateTests
     {
         var reports = Enumerable.Range(1, 30).Select(s => Runner.Run(Starter(), Expeditions.RoadPatrol, (ulong)s)).ToList();
         Assert.True(reports.Count(r => r.Outcome == ExpeditionOutcome.Completed) >= 27);
+    }
+
+    [Fact]
+    public void A_fresh_guardian_can_beat_the_first_boss_and_unlock_tier_two()
+    {
+        // A new player must be able to progress: tier 1 with its boss, starter gear and passives.
+        var map = new ChaosIdle.Domain.Maps.MapInstance { Map = Maps.SunkenCauseway };
+        var reports = Enumerable.Range(1, 40).Select(s => Runner.RunMap(Starter().ToBuild(), "c", map, includeBoss: true, (ulong)s)).ToList();
+        int wins = reports.Count(r => r.Outcome == ExpeditionOutcome.Completed);
+        Assert.True(wins >= 34, $"won {wins}/40");
+        Assert.All(reports.Where(r => r.Outcome == ExpeditionOutcome.Completed), r => Assert.True(r.Encounters[^1].Combat.BossKillTime < 150));
     }
 
     [Fact]
