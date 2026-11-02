@@ -11,7 +11,7 @@ using ChaosIdle.Simulation.Offline;
 namespace ChaosIdle.Simulation.Reporting
 {
     /// <summary>
-    /// Plain-text, English player-facing summaries. The Unity client can show these lines as-is
+    /// Plain-text, English player-facing summaries. The Godot client shows these lines as-is
     /// until it has its own layouts; keep them short enough for a phone screen.
     /// Indicators never rely on colour alone: arrows and words carry the meaning.
     /// </summary>

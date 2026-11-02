@@ -10,7 +10,7 @@ automatic combat, and bounded offline expeditions.
 - **Milestone 2 — vertical slice:** the domain half is done.
   - Done: passive tree, items and affixes, loot, inventory, item comparison, expeditions,
     and player-facing reports.
-  - Not done: the Unity client.
+  - Client: a Godot 4 (.NET) app in `client/`, see [`docs/client.md`](docs/client.md).
 
   See [`docs/milestone-2.md`](docs/milestone-2.md).
 - **Milestone 3 — buildcraft:** the domain half is done.
@@ -44,10 +44,12 @@ automatic combat, and bounded offline expeditions.
 | `src/ChaosIdle.Content` | Original content with stable IDs: class, skills, passive tree, item bases, affixes, monsters, encounters, expeditions, starter character. |
 | `src/ChaosIdle.Persistence` | Versioned save format: save objects, mapping to and from the domain, checksummed JSON envelope, migrations, an atomic save store with a backup. |
 | `src/ChaosIdle.Server` | ASP.NET Core API: accounts, cloud saves, server-owned offline sessions and claims, telemetry. |
+| `src/ChaosIdle.App` | Application layer for clients: `GameSession` (new game or load, expeditions, bag actions, local offline progress on pause/resume). |
+| `client/` | Godot 4 (.NET) client. CI runs a smoke test in the Godot runtime and exports a debug APK. |
 | `src/ChaosIdle.Cli` | `compare` (the Milestone 1 build table), `expedition` (the Milestone 2 loop as text), and `builds` (the Milestone 3 reference-build comparison), `offline` (Milestone 4 offline sessions compared with active play), and `save` (writes and reloads a save). |
 | `tests/ChaosIdle.Tests` | xUnit tests: formulas, pipeline, simulator invariants, diagnosis, passives, items, loot, comparison, expeditions, and both milestone gates. |
 
-The library projects target `netstandard2.1` with C# 9, so Unity can use them unchanged later.
+The library projects target `netstandard2.1` with C# 9: engine-agnostic, shared by the Godot client and the server.
 
 The damage order and all formulas are documented in
 [`docs/combat-pipeline.md`](docs/combat-pipeline.md).
@@ -83,6 +85,13 @@ dotnet run --project src/ChaosIdle.Cli -- save /tmp/saves # writes and reloads a
 ```bash
 dotnet run --project src/ChaosIdle.Server --urls http://127.0.0.1:5077
 ```
+
+```bash
+dotnet build client/ChaosIdle.Client.csproj               # compiles the Godot client without the editor
+```
+
+**Android APK:** every push builds one. Download `chaos-idle-debug-apk` from the
+**Godot client** workflow run's Artifacts (see [`docs/client.md`](docs/client.md)).
 
 ## For Claude Code
 

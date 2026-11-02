@@ -49,8 +49,9 @@ visual identity, items, skill effects, UI, and endgame systems.
 
 Use these defaults unless the user or repository establishes another direction:
 
-- **Client:** Unity, C#, Android and iOS.
-- **Domain rules:** Plain C# modules independent of Unity UI and rendering.
+- **Client:** Godot 4 with C# (.NET), Android first; iOS later (needs a Mac to build).
+  The client lives in `client/` and is a thin view over `ChaosIdle.App`.
+- **Domain rules:** Plain C# modules independent of the engine's UI and rendering.
 - **Backend:** ASP.NET Core modular monolith when cloud accounts or authoritative
   progression are needed.
 - **Database:** PostgreSQL for accounts, characters, inventories, expeditions,
@@ -96,7 +97,7 @@ Suggested module boundaries:
 
 Keep content data separate from code wherever practical. Use stable IDs for
 skills, passive nodes, affixes, monsters, and items. Do not let domain rules
-depend on UI classes, animations, or Unity scene objects.
+depend on UI classes, animations, or engine scene objects.
 
 ## Core game loop
 
@@ -241,7 +242,7 @@ Use milestone gates instead of treating estimates as promises.
 - Gate: two configurations produce meaningfully different outcomes.
 
 ### Milestone 2 — Mobile vertical slice
-- Create a Unity Android build.
+- Create a Godot Android build (CI exports a debug APK).
 - Add one class, a small passive tree, inventory, and automatic combat visuals.
 - Implement loot drops and stat comparison.
 - Gate: a player can complete an expedition and understand its result.

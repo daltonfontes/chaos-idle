@@ -16,5 +16,6 @@
     <ProjectReference Include="../../src/ChaosIdle.Content/ChaosIdle.Content.csproj" />
     <ProjectReference Include="../../src/ChaosIdle.Persistence/ChaosIdle.Persistence.csproj" />
     <ProjectReference Include="../../src/ChaosIdle.Server/ChaosIdle.Server.csproj" />
+    <ProjectReference Include="../../src/ChaosIdle.App/ChaosIdle.App.csproj" />
   </ItemGroup>
 </Project>

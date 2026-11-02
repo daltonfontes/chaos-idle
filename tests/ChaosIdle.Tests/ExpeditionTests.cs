@@ -98,7 +98,7 @@ public class ExpeditionTests
 
 /// <summary>
 /// Milestone 2 gate, domain half: a player can complete an expedition and understand its result.
-/// (The Unity half of the gate needs the mobile client.)
+/// (The client half is the Godot app in client/.)
 /// </summary>
 public class Milestone2GateTests
 {

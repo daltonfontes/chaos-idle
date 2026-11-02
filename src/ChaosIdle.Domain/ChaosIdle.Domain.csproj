@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- netstandard2.1 + C# 9 so the assembly can be dropped into Unity unchanged. -->
+  <!-- netstandard2.1 + C# 9: engine-agnostic, usable by the Godot client, the server, and any .NET host. -->
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>9.0</LangVersion>

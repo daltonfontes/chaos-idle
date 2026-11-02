@@ -1,0 +1,29 @@
+; Engine configuration file.
+; Edited by hand and by the Godot editor; keep keys in Godot's own format.
+
+config_version=5
+
+[application]
+
+config/name="Chaos Idle"
+config/description="An idle ARPG with deep buildcraft."
+run/main_scene="res://Main.tscn"
+config/features=PackedStringArray("4.7", "C#", "Mobile")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=1
+
+[dotnet]
+
+project/assembly_name="ChaosIdle.Client"
+
+[rendering]
+
+renderer/rendering_method="mobile"
+textures/vram_compression/import_etc2_astc=true

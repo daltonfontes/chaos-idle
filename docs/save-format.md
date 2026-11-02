@@ -74,14 +74,16 @@ one, never half of one.
 3. Register it where the serializer is created.
 4. Add a test that loads a payload in the old shape.
 
-## Unity notes
+## Client notes (Godot)
 
-- The save objects are plain classes with public get/set, so Newtonsoft.Json
-  (`com.unity.nuget.newtonsoft-json`) can read them if `System.Text.Json` causes trouble
-  under IL2CPP code stripping. Keep the property names identical (camelCase).
-- Use `Application.persistentDataPath` as the save directory.
-- Save when the app is paused or backgrounded (`OnApplicationPause(true)`), and start the
+- The save directory is `user://saves` (`ProjectSettings.GlobalizePath`). On Android that's
+  the app's private storage.
+- `ChaosIdle.App.GameSession` saves after every change, and on
+  `NotificationApplicationPaused` and `NotificationWMCloseRequest`. It starts the local
   offline checkpoint at the same moment.
+- The save objects are plain classes, so another serializer (e.g. Newtonsoft.Json) could read
+  them if `System.Text.Json` ever gives trouble on a platform. Keep property names identical
+  (camelCase).
 
 ## Not covered yet
 

@@ -5,8 +5,9 @@
 Milestone 2 has two halves:
 
 - **Domain half: done.** All the rules for the slice, written as plain C#, with tests.
-- **Client half: not started.** The Unity Android client and combat visuals. They need the
-  Unity editor, which isn't available in the cloud environment.
+- **Client half: started.** A Godot 4 (.NET) client in `client/` (see `docs/client.md`).
+  Combat visuals aren't done yet. The project originally planned Unity; it moved to Godot
+  because the developer doesn't use Unity and Godot's C# SDK lets CI build and test the client.
 
 ## What exists (domain)
 
@@ -85,28 +86,12 @@ Milestone 2 has two halves:
   2. it farms Road Patrol, compares loot, and equips upgrades;
   3. it tries again, gets further, and fails for a different, explained reason.
 
-## Not done: the Unity client
+## Client
 
-This needs a machine with Unity (2022 LTS or newer, with the Android module):
-
-1. **Bring in the domain.** Run `dotnet build -c Release`, then copy
-   `ChaosIdle.Domain.dll`, `ChaosIdle.Simulation.dll` and `ChaosIdle.Content.dll` from
-   `src/*/bin/Release/netstandard2.1/` into `Assets/Plugins/ChaosIdle/`. The libraries
-   target `netstandard2.1` with C# 9 for this reason; Unity needs nothing else.
-2. **Screens**, each a thin view over existing APIs:
-   - Character: `BuildSummary.Compute(character.ToBuild())`.
-   - Passive tree: `PassiveAllocation.CanAllocate` / `Allocate` / `CanRefund`. Show the
-     `AllocationError` reason text when a node can't be taken.
-   - Inventory and equipment: `Inventory`, `EquipFromInventory`, `ReportText.ItemTooltip`.
-   - Item comparison: `ItemComparer.Compare` and `ReportText.Comparison`.
-   - Expedition: `ExpeditionRunner.Run`, then `ReportText.Expedition` and `ClaimLoot`.
-3. **Combat visuals.** Replay a finished `CombatReport` rather than simulating in the
-   scene, so visuals can never change outcomes. The report needs a per-event timeline
-   first. That is a small addition: `CombatSimulator` already has every event at the point
-   it records totals.
-4. **Saves** aren't part of Milestone 2's gate. Persistent IDs already exist on every
-   definition, and item instances carry IDs for their base and affixes, ready for a
-   versioned save format.
+The client is a Godot 4 (.NET) project in `client/`; see `docs/client.md`. It is a thin view
+over `ChaosIdle.App.GameSession`. Combat should be shown by replaying a finished
+`CombatReport` rather than simulating in the scene, so visuals can never change outcomes.
+That needs a per-event timeline in the report first.
 
 ## Known limitations
 
