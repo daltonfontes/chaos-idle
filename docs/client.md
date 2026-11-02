@@ -1,6 +1,6 @@
 # Godot client
 
-`client/` is a Godot 4 project with C# (.NET 8). The project first planned Unity and moved to
+`client/` is a Godot 4 project with C# (.NET 9, which Godot 4.7's Android export requires). The project first planned Unity and moved to
 Godot because:
 - Godot is free and light to install;
 - it uses C#, so the game libraries plug in unchanged;
