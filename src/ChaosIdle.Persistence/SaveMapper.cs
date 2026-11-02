@@ -68,7 +68,6 @@ namespace ChaosIdle.Persistence
 
         private static LoadoutSave ToLoadout(PlayerCharacter c)
         {
-            var skills = c.TriggeredSkills.Append(c.PrimarySkill);
             return new LoadoutSave
             {
                 ClassId = c.Class.Id,
@@ -78,8 +77,7 @@ namespace ChaosIdle.Persistence
                 Equipment = c.Equipment.Items.ToDictionary(kv => kv.Key.ToString(), kv => ToSave(kv.Value)),
                 PrimarySkillId = c.PrimarySkill.Id,
                 TriggeredSkillIds = c.TriggeredSkills.Select(s => s.Id).ToList(),
-                Supports = skills.Where(s => c.SupportsFor(s).Count > 0)
-                    .ToDictionary(s => s.Id, s => c.SupportsFor(s).Select(x => x.Id).ToList()),
+                Supports = c.AllSupportLinks.ToDictionary(kv => kv.Key, kv => kv.Value.Select(x => x.Id).ToList()),
             };
         }
 
@@ -193,8 +191,7 @@ namespace ChaosIdle.Persistence
                         continue;
                     }
 
-                    if (skill.Id != character.PrimarySkill.Id && character.TriggeredSkills.All(t => t.Id != skill.Id)) continue;
-                    var result = character.LinkSupport(skill, support);
+                    var result = character.RestoreSupport(skill, support);
                     if (result != Domain.Skills.SupportCompatibility.Compatible)
                         warnings.Add($"Support {supportId} could not be linked to {skill.Id} ({result}) and was unlinked.");
                 }
