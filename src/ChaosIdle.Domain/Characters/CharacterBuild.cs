@@ -12,6 +12,9 @@ namespace ChaosIdle.Domain.Characters
         public string Id { get; init; } = "";
         public string Name { get; init; } = "";
         public IReadOnlyList<Modifier> BaseModifiers { get; init; } = Array.Empty<Modifier>();
+
+        /// <summary>The passive tree this class uses; it begins at the tree's start node for this class id.</summary>
+        public string PassiveTreeId { get; init; } = "";
     }
 
     /// <summary>

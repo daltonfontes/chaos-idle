@@ -9,15 +9,15 @@ namespace ChaosIdle.Tests;
 
 public class KeystoneTests
 {
-    private static readonly string[] ToBastion = { "pas.def.frame1", "pas.def.guard1", "pas.def.guard2", "pas.def.shieldwall", "pas.key.bastion" };
-
     [Fact]
     public void Bastion_lets_block_apply_to_spells_at_the_cost_of_life()
     {
         var character = StarterCharacters.NewGuardian();
-        character.Passives = PassiveAllocation.FromPath(PassiveTrees.Guardian, 12, ToBastion.Take(4).ToArray());
+        // Walk to the node right before the keystone, then take the keystone alone.
+        var almost = PassiveAllocation.FromTargets(StarterCharacters.EmptyPassives(20), "pas.reach.240");
+        character.Passives = almost;
         var without = character.ToBuild().ComputeStats();
-        character.Passives = character.Passives.Allocate("pas.key.bastion");
+        character.Passives = almost.Allocate("pas.key.bastion");
         var with = character.ToBuild().ComputeStats();
 
         Assert.False(DefenceStats.From(without).BlockSpells);

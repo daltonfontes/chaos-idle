@@ -79,7 +79,7 @@ namespace ChaosIdle.App
             }
 
             var guardian = StarterCharacters.NewGuardian("char.guardian", "Guardian");
-            guardian.Passives = PassiveAllocation.FromPath(PassiveTrees.Guardian, StarterCharacters.StartingPassivePoints, StarterCharacters.BulwarkPath);
+            guardian.Passives = StarterCharacters.StarterPassives();
             var state = new GameState(guardian, new MapProgress(), BuildRelevance.FilterFor(guardian.ToBuild()));
             var session = new GameSession(store, state, seeds, loot) { LoadNotices = new[] { "A new Guardian joins the hunt." } };
             session.Save(nowUtc);

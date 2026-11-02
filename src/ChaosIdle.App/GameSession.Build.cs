@@ -22,12 +22,16 @@ namespace ChaosIdle.App
     }
 
     public sealed record PassiveNodeView(
-        string Id, string Name, string Description, PassiveNodeKind Kind, string Branch, PassiveState State, string Reason);
+        string Id, string Name, string Description, PassiveNodeKind Kind, string Branch, PassiveState State, string Reason,
+        double X, double Y, bool IsOwnStart);
 
-    public sealed record PassiveTreeView(int PointsSpent, int PointsTotal, IReadOnlyList<PassiveNodeView> Nodes)
+    public sealed record PassiveTreeView(int PointsSpent, int PointsTotal, IReadOnlyList<PassiveNodeView> Nodes, IReadOnlyList<(string A, string B)> Links)
     {
         public int PointsRemaining => PointsTotal - PointsSpent;
     }
+
+    /// <summary>The route to a node: the nodes to take in order (target last) and what they change together.</summary>
+    public sealed record PassivePath(string TargetId, IReadOnlyList<string> NodeIds, bool CanTake, IReadOnlyList<string> Lines);
 
     public sealed record SkillView(string Id, string Name, bool IsPrimary, string Kind, IReadOnlyList<SupportOption> Linked, int FreeSockets);
 
@@ -49,7 +53,6 @@ namespace ChaosIdle.App
     /// <summary>Passive tree and skill/support screens.</summary>
     public sealed partial class GameSession
     {
-        private static readonly string[] BranchOrder = { "Start", "Defence", "Melee", "Spell", "Wards", "Keystones" };
 
         // ---- Passive tree ----
 
@@ -59,21 +62,63 @@ namespace ChaosIdle.App
             var nodes = a.Tree.Nodes
                 .Select(n =>
                 {
+                    bool own = n.Id == a.StartNodeId;
                     if (a.IsAllocated(n.Id))
                     {
-                        string why = n.Id == a.Tree.StartNodeId ? "Your starting point." : RefundReason(a.CanRefund(n.Id));
-                        return new PassiveNodeView(n.Id, n.Name, n.Description, n.Kind, Branch(n), PassiveState.Allocated, why);
+                        string why = own ? "Your starting point." : RefundReason(a.CanRefund(n.Id));
+                        return new PassiveNodeView(n.Id, n.Name, n.Description, n.Kind, Branch(n), PassiveState.Allocated, why, n.X, n.Y, own);
                     }
 
                     var error = a.CanAllocate(n.Id);
+                    string reason = error == AllocationError.None ? AllocateReason(error) : LockedReason(a, n.Id, error);
                     return new PassiveNodeView(n.Id, n.Name, n.Description, n.Kind, Branch(n),
-                        error == AllocationError.None ? PassiveState.Available : PassiveState.Locked, AllocateReason(error));
+                        error == AllocationError.None ? PassiveState.Available : PassiveState.Locked, reason, n.X, n.Y, false);
                 })
-                .OrderBy(n => Array.IndexOf(BranchOrder, n.Branch))
+                .OrderBy(n => BranchRank(n.Branch))
+                .ThenBy(n => n.Branch, StringComparer.Ordinal)
                 .ThenBy(n => n.State)
                 .ThenBy(n => n.Id, StringComparer.Ordinal)
                 .ToList();
-            return new PassiveTreeView(a.PointsSpent, a.TotalPoints, nodes);
+            return new PassiveTreeView(a.PointsSpent, a.TotalPoints, nodes, a.Tree.Links);
+        }
+
+        /// <summary>
+        /// The shortest route from what you have to <paramref name="nodeId"/>, its cost, and its
+        /// combined effect. For an allocated node, the same as <see cref="PreviewPassive"/>.
+        /// </summary>
+        public PassivePath PreviewPath(string nodeId)
+        {
+            var a = Character.Passives;
+            if (!a.Tree.Contains(nodeId)) throw new ArgumentException($"Unknown passive {nodeId}.");
+            if (a.IsAllocated(nodeId)) return new PassivePath(nodeId, Array.Empty<string>(), false, PreviewPassive(nodeId));
+
+            var node = a.Tree[nodeId];
+            var lines = new List<string> { $"{node.Name} ({node.Kind})", node.Description };
+            var (error, cost) = a.CanAllocatePath(nodeId);
+            var path = a.PathTo(nodeId) ?? Array.Empty<string>();
+            if (error == AllocationError.OtherClassStart)
+            {
+                lines.Add("Another class begins here; you can't take it or walk through it.");
+                return new PassivePath(nodeId, Array.Empty<string>(), false, lines);
+            }
+
+            lines.Add(cost == 1 ? "1 point: right next to your passives." : $"{cost} points along the shortest path.");
+            if (error != AllocationError.None) lines.Add(LockedReason(a, nodeId, error));
+            var after = error == AllocationError.None ? a.AllocatePath(nodeId) : PassiveAllocation.FromPath(Unlimited(a), path.ToArray());
+            lines.Add(error == AllocationError.None ? "If you take the path:" : "With enough points, the path would give:");
+            lines.AddRange(DiffLines(Character.ToBuild(), WithPassives(after)));
+            return new PassivePath(nodeId, path, error == AllocationError.None, lines);
+        }
+
+        /// <summary>Takes every node on the shortest path to <paramref name="nodeId"/>.</summary>
+        public string AllocatePath(string nodeId, DateTime nowUtc)
+        {
+            var a = Character.Passives;
+            var (error, cost) = a.CanAllocatePath(nodeId);
+            if (error != AllocationError.None) return LockedReason(a, nodeId, error);
+            Character.Passives = a.AllocatePath(nodeId);
+            Save(nowUtc);
+            return $"Took {a.Tree[nodeId].Name} ({cost} point{(cost == 1 ? "" : "s")}). {Character.Passives.PointsRemaining} point(s) left.";
         }
 
         /// <summary>What taking (or, if allocated, refunding) this node changes on the character sheet.</summary>
@@ -110,7 +155,7 @@ namespace ChaosIdle.App
         {
             var a = Character.Passives;
             var error = a.CanAllocate(nodeId);
-            if (error != AllocationError.None) return AllocateReason(error);
+            if (error != AllocationError.None) return a.Tree.Contains(nodeId) ? LockedReason(a, nodeId, error) : AllocateReason(error);
             Character.Passives = a.Allocate(nodeId);
             Save(nowUtc);
             return $"Took {a.Tree[nodeId].Name}. {Character.Passives.PointsRemaining} point(s) left.";
@@ -247,16 +292,40 @@ namespace ChaosIdle.App
             }).ToList();
         }
 
+        /// <summary>Start, Roads (ring, spokes, bridges, rim paths), one branch per cluster theme, Keystones.</summary>
         private static string Branch(PassiveNode n)
         {
             if (n.Kind == PassiveNodeKind.Start) return "Start";
             if (n.Kind == PassiveNodeKind.Keystone) return "Keystones";
-            if (n.Id.StartsWith("pas.def.", StringComparison.Ordinal)) return "Defence";
-            if (n.Id.StartsWith("pas.mel.", StringComparison.Ordinal)) return "Melee";
-            if (n.Id.StartsWith("pas.spl.", StringComparison.Ordinal)) return "Spell";
-            if (n.Id.StartsWith("pas.wrd.", StringComparison.Ordinal)) return "Wards";
-            return "Other";
+            var parts = n.Id.Split('.');
+            if (parts.Length < 3) return "Other";
+            switch (parts[1])
+            {
+                case "ring":
+                case "spoke":
+                case "bridge":
+                case "reach":
+                    return "Roads";
+                default:
+                    return char.ToUpperInvariant(parts[1][0]) + parts[1].Substring(1);
+            }
         }
+
+        private static int BranchRank(string branch) => branch == "Start" ? 0 : branch == "Keystones" ? 3 : branch == "Roads" ? 2 : 1;
+
+        /// <summary>Why a node can't be taken right now, including how far away it is.</summary>
+        private static string LockedReason(PassiveAllocation a, string id, AllocationError error)
+        {
+            if (error == AllocationError.OtherClassStart) return "Another class begins here.";
+            var (pathError, cost) = a.CanAllocatePath(id);
+            if (pathError == AllocationError.None) return $"{cost} points away: take the path to reach it.";
+            if (pathError == AllocationError.NotEnoughPoints) return $"{cost} points away, but you have {a.PointsRemaining} left: refund some passives first.";
+            return AllocateReason(error);
+        }
+
+        /// <summary>The same allocation with points to spare, to preview paths you can't afford yet.</summary>
+        private static PassiveAllocation Unlimited(PassiveAllocation a) =>
+            PassiveAllocation.FromSet(a.Tree, a.TotalPoints + 1000, a.StartNodeId, a.Allocated, out _);
 
         private static string AllocateReason(AllocationError e)
         {

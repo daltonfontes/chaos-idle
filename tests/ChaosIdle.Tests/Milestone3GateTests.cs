@@ -82,6 +82,6 @@ public class Milestone3GateTests
                 Assert.All(i.Affixes, a => Assert.Contains(i.Class, a.Affix.AllowedClasses)));
         }
 
-        Assert.Contains(ReferenceBuilds.EmberLancer().Passives.Allocated, id => PassiveTrees.Guardian[id].Kind == PassiveNodeKind.Keystone);
+        Assert.Contains(ReferenceBuilds.EmberLancer().Passives.Allocated, id => PassiveTrees.World[id].Kind == PassiveNodeKind.Keystone);
     }
 }

@@ -23,6 +23,10 @@ window/handheld/orientation=1
 
 project/assembly_name="ChaosIdle.Client"
 
+[input_devices]
+
+pointing/android/enable_pan_and_scale_gestures=true
+
 [rendering]
 
 renderer/rendering_method="mobile"

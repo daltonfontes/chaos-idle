@@ -15,7 +15,7 @@ public partial class PassivesTab : VBoxContainer
     private readonly Func<GameSession?> _session;
     private readonly Action _changed;
     private Label _points = null!;
-    private ItemList _nodes = null!;
+    private TreeCanvas _canvas = null!;
     private Label _details = null!;
     private Button _take = null!;
     private Button _refund = null!;
@@ -32,14 +32,30 @@ public partial class PassivesTab : VBoxContainer
 
     public override void _Ready()
     {
-        AddThemeConstantOverride("separation", 10);
+        AddThemeConstantOverride("separation", 8);
         _points = new Label();
         AddChild(_points);
-        AddChild(new Label { Text = "● taken   ○ available   · locked   ★ keystone", AutowrapMode = TextServer.AutowrapMode.WordSmart });
+        AddChild(new Label
+        {
+            Text = "Filled: taken · thick ring: available · blue: your chosen path · X: another class · double ring: keystone",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        });
 
-        _nodes = new ItemList { SizeFlagsVertical = SizeFlags.ExpandFill, CustomMinimumSize = new Vector2(0, 420) };
-        _nodes.ItemSelected += index => Select(_nodes.GetItemMetadata((int)index).AsString());
-        AddChild(_nodes);
+        _canvas = new TreeCanvas { CustomMinimumSize = new Vector2(0, 640), SizeFlagsVertical = SizeFlags.ExpandFill };
+        _canvas.NodeTapped += Select;
+        AddChild(_canvas);
+
+        var view = new HBoxContainer();
+        var minus = new Button { Text = "−", CustomMinimumSize = new Vector2(80, 0) };
+        var plus = new Button { Text = "+", CustomMinimumSize = new Vector2(80, 0) };
+        var center = new Button { Text = "Centre", SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        minus.Pressed += () => _canvas.ZoomBy(1 / 1.25f);
+        plus.Pressed += () => _canvas.ZoomBy(1.25f);
+        center.Pressed += () => _canvas.CenterOnStart();
+        view.AddChild(minus);
+        view.AddChild(plus);
+        view.AddChild(center);
+        AddChild(view);
 
         _details = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         AddChild(_details);
@@ -47,7 +63,7 @@ public partial class PassivesTab : VBoxContainer
         var buttons = new HBoxContainer();
         _take = new Button { Text = "Take", Disabled = true, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         _refund = new Button { Text = "Refund", Disabled = true, SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        _take.Pressed += () => Act(s => s.AllocatePassive(_selected!, DateTime.UtcNow));
+        _take.Pressed += () => Act(s => s.AllocatePath(_selected!, DateTime.UtcNow));
         _refund.Pressed += () => Act(s => s.RefundPassive(_selected!, DateTime.UtcNow));
         buttons.AddChild(_take);
         buttons.AddChild(_refund);
@@ -57,40 +73,27 @@ public partial class PassivesTab : VBoxContainer
     public void Refresh()
     {
         var session = _session();
-        if (session == null || _nodes == null) return;
+        if (session == null || _canvas == null) return;
         var tree = session.PassiveTree();
         _points.Text = $"Passive points: {tree.PointsSpent}/{tree.PointsTotal} used, {tree.PointsRemaining} free";
-
-        _nodes.Clear();
-        string? branch = null;
-        foreach (var n in tree.Nodes)
-        {
-            if (n.Branch != branch)
-            {
-                branch = n.Branch;
-                int header = _nodes.AddItem($"— {branch} —", null, selectable: false);
-                _nodes.SetItemDisabled(header, true);
-            }
-
-            string marker = n.State switch { PassiveState.Allocated => "●", PassiveState.Available => "○", _ => "·" };
-            string star = n.Kind == PassiveNodeKind.Keystone ? " ★" : n.Kind == PassiveNodeKind.Notable ? " (notable)" : "";
-            int index = _nodes.AddItem($"{marker} {n.Name}{star}");
-            _nodes.SetItemMetadata(index, n.Id);
-            _nodes.SetItemTooltip(index, n.Description);
-        }
+        _canvas.SetView(tree);
 
         if (_selected != null) Select(_selected);
         else
         {
-            _details.Text = "Tap a passive to see what it does and what taking it changes.";
+            _canvas.ShowSelection(null, Array.Empty<string>());
+            _details.Text = "Drag to move, pinch or use − / + to zoom. Tap a passive to see the path to it, its cost and what it changes.";
             _take.Disabled = _refund.Disabled = true;
+            _take.Text = "Take";
         }
     }
 
+    /// <summary>Selects a node and centres the view on it (used by screenshots).</summary>
     public void Preview(string id)
     {
         Refresh();
         Select(id);
+        _canvas.CenterOn(id);
     }
 
     private void Select(string id)
@@ -98,10 +101,15 @@ public partial class PassivesTab : VBoxContainer
         var session = _session();
         if (session == null) return;
         _selected = id;
+        var path = session.PreviewPath(id);
         var node = session.PassiveTree().Nodes.FirstOrDefault(n => n.Id == id);
-        _details.Text = string.Join("\n", session.PreviewPassive(id));
-        _take.Disabled = node?.State != PassiveState.Available;
-        _refund.Disabled = node?.State != PassiveState.Allocated;
+        _details.Text = string.Join("\n", path.Lines);
+        _canvas.ShowSelection(id, path.NodeIds);
+
+        bool allocated = node?.State == PassiveState.Allocated;
+        _take.Disabled = !path.CanTake;
+        _take.Text = path.NodeIds.Count > 1 ? $"Take path ({path.NodeIds.Count} points)" : "Take";
+        _refund.Disabled = !allocated || node!.IsOwnStart;
     }
 
     private void Act(Func<GameSession, string> action)

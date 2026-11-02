@@ -35,8 +35,7 @@ internal static class TestContent
     public static ChaosIdle.Domain.Characters.PlayerCharacter StarterWithPassives()
     {
         var c = StarterCharacters.NewGuardian();
-        c.Passives = ChaosIdle.Domain.PassiveTree.PassiveAllocation.FromPath(
-            PassiveTrees.Guardian, StarterCharacters.StartingPassivePoints, StarterCharacters.BulwarkPath);
+        c.Passives = StarterCharacters.StarterPassives();
         return c;
     }
 

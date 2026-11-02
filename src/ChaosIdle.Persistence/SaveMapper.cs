@@ -73,7 +73,7 @@ namespace ChaosIdle.Persistence
                 ClassId = c.Class.Id,
                 PassiveTreeId = c.Passives.Tree.Id,
                 PassivePoints = c.Passives.TotalPoints,
-                AllocatedPassives = c.Passives.Allocated.Where(id => id != c.Passives.Tree.StartNodeId).OrderBy(x => x, StringComparer.Ordinal).ToList(),
+                AllocatedPassives = c.Passives.Allocated.Where(id => id != c.Passives.StartNodeId).OrderBy(x => x, StringComparer.Ordinal).ToList(),
                 Equipment = c.Equipment.Items.ToDictionary(kv => kv.Key.ToString(), kv => ToSave(kv.Value)),
                 PrimarySkillId = c.PrimarySkill.Id,
                 TriggeredSkillIds = c.TriggeredSkills.Select(s => s.Id).ToList(),
@@ -141,9 +141,19 @@ namespace ChaosIdle.Persistence
         private static PlayerCharacter BuildCharacter(string id, string name, LoadoutSave l, int capacity, ContentRegistry content, List<string> warnings)
         {
             var cls = content.Class(l.ClassId) ?? throw new SaveLoadException(SaveLoadError.MissingContent, $"Unknown class {l.ClassId}.");
-            var tree = content.PassiveTree(l.PassiveTreeId) ?? throw new SaveLoadException(SaveLoadError.MissingContent, $"Unknown passive tree {l.PassiveTreeId}.");
+            var tree = content.PassiveTree(l.PassiveTreeId);
+            var allocated = (IEnumerable<string>)l.AllocatedPassives;
+            if (tree == null)
+            {
+                // The tree was replaced by a new one: keep the points, refund every node.
+                tree = content.PassiveTree(cls.PassiveTreeId)
+                       ?? throw new SaveLoadException(SaveLoadError.MissingContent, $"Unknown passive tree {l.PassiveTreeId}.");
+                if (l.AllocatedPassives.Count > 0)
+                    warnings.Add($"The passive tree was redesigned: your {l.AllocatedPassives.Count} passive point(s) were refunded.");
+                allocated = Array.Empty<string>();
+            }
 
-            var passives = PassiveAllocation.FromSet(tree, l.PassivePoints, l.AllocatedPassives, out var dropped);
+            var passives = PassiveAllocation.FromSet(tree, l.PassivePoints, tree.StartNodeFor(cls.Id), allocated, out var dropped);
             foreach (var d in dropped) warnings.Add($"Passive {d} could not be restored; its point was refunded.");
 
             var character = new PlayerCharacter(id, name, cls, passives, capacity)

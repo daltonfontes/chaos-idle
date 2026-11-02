@@ -144,14 +144,17 @@ namespace ChaosIdle.Content
             },
         };
 
-        /// <summary>Tier 1 boss: slow, armoured, telegraphed physical crushes.</summary>
+        /// <summary>
+        /// Tier 1 boss: slow, telegraphed physical crushes. Tuned so a fresh Guardian with the
+        /// starter passives and starting gear wins most fights (see Milestone2GateTests).
+        /// </summary>
         public static readonly EnemyDefinition BogTyrant = new EnemyDefinition
         {
             Id = "boss.bog_tyrant",
             Name = "The Bog Tyrant",
             IsBoss = true,
-            MaxLife = 2500,
-            Armour = 500,
+            MaxLife = 1600,
+            Armour = 250,
             Accuracy = 450,
             ActionTimeSeconds = 2.0,
             GuaranteedDrops = 2,
@@ -160,12 +163,12 @@ namespace ChaosIdle.Content
                 new EnemyAttackDefinition
                 {
                     Id = "attack.bog_tyrant.mire_crush", Name = "Mire Crush", CooldownSeconds = 6,
-                    Damage = new[] { new DamageRange(DamageType.Physical, 70, 100) },
+                    Damage = new[] { new DamageRange(DamageType.Physical, 55, 80) },
                 },
                 new EnemyAttackDefinition
                 {
                     Id = "attack.bog_tyrant.sludge_swipe", Name = "Sludge Swipe",
-                    Damage = new[] { new DamageRange(DamageType.Physical, 30, 45) },
+                    Damage = new[] { new DamageRange(DamageType.Physical, 25, 38) },
                 },
             },
         };

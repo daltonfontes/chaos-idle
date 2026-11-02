@@ -29,7 +29,7 @@ public partial class Screenshots : Node
 
             main.ShowTab(1);
             await Frames(2);
-            main.PreviewPassive("pas.wrd.ember");
+            main.PreviewPassive("pas.key.bastion");
             await Capture(dir, "2-passives.png");
 
             main.ShowTab(2);
