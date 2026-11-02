@@ -37,6 +37,7 @@ One slot is `<slot>.json` plus `<slot>.json.bak`, the previous good save.
 | `mapProgress` | highest unlocked tier, bosses defeated |
 | `lootFilter` | name, default action, ordered rules (enums stored by name) |
 | `offline` | the running session: id, map, modifiers, UTC start, seed, and the **frozen loadout** from when it started |
+| `offlineMap` | optional: the map and modifiers offline sessions farm (absent in saves made before it existed) |
 | `claimedOfflineSessions` | the last 100 claimed session ids; restoring an older save can't make a session claimable again |
 
 The domain side is `Domain/Profile/GameState`: the character, progress, loot filter, the

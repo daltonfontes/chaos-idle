@@ -100,18 +100,22 @@ namespace ChaosIdle.App
         }
 
         public IReadOnlyList<ExpeditionChoice> Expeditions() =>
-            Maps.All.Select(m => new ExpeditionChoice(m.Id, m.Name, m.Tier, State.Progress.CanRun(m))).ToList();
+            Content.Maps.All.Select(m => new ExpeditionChoice(m.Id, m.Name, m.Tier, State.Progress.CanRun(m))).ToList();
+
+        /// <summary>Runs a map actively without modifiers (boss included).</summary>
+        public IReadOnlyList<string> RunExpedition(string mapId, DateTime nowUtc) =>
+            RunExpedition(mapId, Array.Empty<string>(), nowUtc);
 
         /// <summary>
         /// Runs a map actively (boss included), claims loot through the loot filter, records a
         /// boss kill for tier unlocks, saves, and returns the report lines.
         /// </summary>
-        public IReadOnlyList<string> RunExpedition(string mapId, DateTime nowUtc)
+        private IReadOnlyList<string> RunMapInstance(MapInstance instance, DateTime nowUtc)
         {
-            var map = Maps.All.FirstOrDefault(m => m.Id == mapId) ?? throw new ArgumentException($"Unknown map {mapId}.");
+            var map = instance.Map;
             if (!State.Progress.CanRun(map)) return new[] { $"{map.Name} is locked: defeat the tier {map.Tier - 1} boss first." };
 
-            var report = _runner.RunMap(Character.ToBuild(), Character.Id, new MapInstance { Map = map }, includeBoss: true, _seeds());
+            var report = _runner.RunMap(Character.ToBuild(), Character.Id, instance, includeBoss: true, _seeds());
             var lines = ReportText.Expedition(report).ToList();
             lines.Add(ReportText.Claim(report.ClaimLoot(Character.Inventory, State.LootFilter)));
 
@@ -169,8 +173,7 @@ namespace ChaosIdle.App
         {
             if (State.Offline == null)
             {
-                var map = Maps.All.Where(State.Progress.CanRun).OrderByDescending(m => m.Tier).First();
-                var checkpoint = OfflineCheckpoint.Start("local_" + _seeds().ToString("x16"), Character, new MapInstance { Map = map }, nowUtc, _seeds());
+                var checkpoint = OfflineCheckpoint.Start("local_" + _seeds().ToString("x16"), Character, EffectiveOfflineMap(), nowUtc, _seeds());
                 State.StartOffline(checkpoint);
             }
 

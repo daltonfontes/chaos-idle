@@ -24,6 +24,8 @@ public partial class Main : Control
     private TabContainer _tabs = null!;
     private PassivesTab _passives = null!;
     private SkillsTab _skillsTab = null!;
+    private MapsTab _mapsTab = null!;
+    private LootTab _lootTab = null!;
 
     public override void _Ready()
     {
@@ -81,18 +83,27 @@ public partial class Main : Control
         var tabs = _tabs = new TabContainer();
         margin.AddChild(tabs);
 
-        var adventure = new ScrollContainer { Name = "Adventure", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        var adventure = new ScrollContainer { Name = "Hero", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         tabs.AddChild(adventure);
         var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
         column.AddThemeConstantOverride("separation", 12);
         adventure.AddChild(column);
 
         // The build tabs share the session; any change there refreshes the sheet and bag here.
-        _passives = new PassivesTab(() => _session, Refresh);
+        _mapsTab = new MapsTab(() => _session, lines =>
+        {
+            Show(lines);
+            Refresh();
+            _tabs.CurrentTab = 0; // read the report on the Hero tab
+        });
+        _passives = new PassivesTab(() => _session, Refresh) { Name = "Tree" };
         _skillsTab = new SkillsTab(() => _session, Refresh);
+        _lootTab = new LootTab(() => _session);
+        tabs.AddChild(Scrolling(_mapsTab));
         tabs.AddChild(_passives); // not in a ScrollContainer: dragging pans the tree instead of scrolling
         tabs.AddChild(Scrolling(_skillsTab));
-        tabs.TabChanged += _ => { _passives.Refresh(); _skillsTab.Refresh(); };
+        tabs.AddChild(Scrolling(_lootTab));
+        tabs.TabChanged += _ => { _mapsTab.Refresh(); _passives.Refresh(); _skillsTab.Refresh(); _lootTab.Refresh(); };
 
         column.AddChild(new Label { Text = "Chaos Idle", HorizontalAlignment = HorizontalAlignment.Center });
         _sheet = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
@@ -140,6 +151,10 @@ public partial class Main : Control
 
     public void PreviewPassive(string id) => _passives.Preview(id);
 
+    public void ChooseMap(string mapId, params string[] modifierIds) => _mapsTab.Choose(mapId, modifierIds);
+
+    public void SetLootFilter(ChaosIdle.App.FilterPreset preset, ChaosIdle.Domain.Items.ItemRarity minimum) => _lootTab.Set(preset, minimum);
+
     public void PreviewSupport(string skillId, string supportId) => _skillsTab.Preview(skillId, supportId);
 
     private static ScrollContainer Scrolling(Control content)
@@ -156,21 +171,9 @@ public partial class Main : Control
         _sheet.Text = string.Join("\n", _session.CharacterSheet());
 
         foreach (var child in _maps.GetChildren()) child.QueueFree();
-        foreach (var choice in _session.Expeditions())
-        {
-            var button = new Button
-            {
-                Text = choice.Unlocked ? $"T{choice.Tier} {choice.Name}" : $"T{choice.Tier} locked",
-                Disabled = !choice.Unlocked,
-            };
-            string id = choice.Id;
-            button.Pressed += () =>
-            {
-                Show(_session.RunExpedition(id, DateTime.UtcNow));
-                Refresh();
-            };
-            _maps.AddChild(button);
-        }
+        var go = new Button { Text = "Maps: choose a map and modifiers →" };
+        go.Pressed += () => _tabs.CurrentTab = 1;
+        _maps.AddChild(go);
 
         _bag.Clear();
         foreach (var row in _session.Inventory())

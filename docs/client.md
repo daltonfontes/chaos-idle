@@ -12,7 +12,8 @@ Godot because:
 | Piece | What it does |
 |---|---|
 | `src/ChaosIdle.App` (`GameSession`) | Everything the screens do, with no Godot types: load or create the save, the character sheet, expeditions (active, boss included, tier unlocks), the bag (describe and compare, equip, discard), and local offline progress on pause/resume. Unit-tested in `GameSessionTests`. |
-| `client/Main.cs` + `Main.tscn` | The main screen, built in code (portrait 720×1280, larger font), with three tabs. **Adventure:** character sheet, maps, report, bag. **Passives** and **Skills:** `client/BuildTabs.cs`. |
+| `client/Main.cs` + `Main.tscn` | The main screen, built in code (portrait 720×1280, larger font), with five tabs: **Hero** (character sheet, report, bag), **Maps**, **Tree**, **Skills**, **Loot**. |
+| `client/MapsLootTabs.cs` | **Maps:** pick a map and up to three modifiers; the preview lists packs, boss, each modifier's risk and reward, the total loot bonus, and an estimate from 20 quick simulations with your build ("boss beaten 60%", main danger). "Run map" runs it and shows the report on Hero; "Farm offline here" sets the map offline sessions use. **Loot:** preset (show everything / focused on your build / strict), a minimum rarity to pick up (uniques always kept), the rules in words in the order they're checked, and your bag as the filter would treat it. |
 | `client/TreeCanvas.cs` | Draws the shared passive tree: drag to move, pinch / mouse wheel / − + buttons to zoom. Filled = taken, thick ring = available, blue = the selected path, X = another class's start, double ring = keystone. |
 | `client/BuildTabs.cs` | **Passives:** the drawn tree; tapping any node shows the shortest path to it, its cost and the combined character-sheet change, with "Take path (N points)" and "Refund". **Skills:** choose the main skill, see each skill's supports and free sockets; tapping a support previews its effect or explains why it doesn't fit. |
 | `client/Screenshots.cs` + `Screenshots.tscn` | CI only: opens the real main screen, plays an expedition, and saves a PNG of each tab. |
@@ -57,7 +58,7 @@ release.
 
 ## Next steps
 
-- Show map modifiers, uniques' details and the loot filter on screen.
+- Editing single loot filter rules (today: presets plus a minimum rarity).
 - Combat visuals by replaying a finished `CombatReport`, so visuals can't change outcomes.
   This needs a per-event timeline added to the report.
 - Sign-in and cloud saves against the server.
