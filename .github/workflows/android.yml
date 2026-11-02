@@ -73,10 +73,17 @@ jobs:
 
       - name: Export debug APK
         run: |
+          set -o pipefail
           mkdir -p client/build
-          "$GODOT" --headless --path client --export-debug "Android" build/chaos-idle-debug.apk
-          test -s client/build/chaos-idle-debug.apk
+          "$GODOT" --headless --path client --export-debug "Android" build/chaos-idle-debug.apk 2>&1 | tee export.log
           ls -l client/build
+          # Godot can finish an export "with warnings" while leaving the C# code out of the APK.
+          # Fail on any export error, and prove the game assembly is inside the package.
+          if grep -E "^ERROR: (Export|System\.|Cannot export)" export.log; then
+            echo "::error::Godot reported export errors (see above)."; exit 1
+          fi
+          unzip -l client/build/chaos-idle-debug.apk | grep -E "ChaosIdle\.(Client|App|Domain|Simulation)\.dll" \
+            || { echo "::error::The APK does not contain the game's .NET assemblies."; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:
