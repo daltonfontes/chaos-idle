@@ -1,0 +1,85 @@
+name: Godot client
+
+# Builds the Godot client, runs a smoke test inside the real Godot runtime, and exports a
+# debug APK you can install on a phone (download it from the run's "Artifacts").
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.7.2"   # must equal the Godot.NET.Sdk version in client/ChaosIdle.Client.csproj
+
+jobs:
+  client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Godot (.NET) and export templates
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          curl -fsSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_mono_linux_x86_64.zip"
+          unzip -q godot.zip -d "$HOME/godot"
+          bin=$(find "$HOME/godot" -type f -name "Godot_v*_mono_linux*.x86_64" | head -1)
+          chmod +x "$bin"
+          echo "GODOT=$bin" >> "$GITHUB_ENV"
+
+          curl -fsSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_mono_export_templates.tpz"
+          dest="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable.mono"
+          mkdir -p "$dest"
+          unzip -q templates.tpz -d "$RUNNER_TEMP/templates"
+          mv "$RUNNER_TEMP/templates/templates/"* "$dest/"
+
+      - name: Configure Android SDK, Java and debug keystore
+        run: |
+          set -euo pipefail
+          minor="${GODOT_VERSION%.*}"
+          mkdir -p "$HOME/.config/godot"
+          for name in "editor_settings-4.tres" "editor_settings-${minor}.tres"; do
+            cat > "$HOME/.config/godot/$name" <<SETTINGS
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          SETTINGS
+          done
+          keytool -genkeypair -v -keystore "$RUNNER_TEMP/debug.keystore" -storepass android -alias androiddebugkey \
+            -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> "$GITHUB_ENV"
+
+      - name: Import project and build C#
+        run: |
+          "$GODOT" --headless --path client --import
+          dotnet build client/ChaosIdle.Client.csproj
+
+      - name: Smoke test in the Godot runtime
+        run: |
+          "$GODOT" --headless --path client res://Smoke.tscn 2>&1 | tee smoke.log
+          grep -q "SMOKE OK" smoke.log
+
+      - name: Export debug APK
+        run: |
+          mkdir -p client/build
+          "$GODOT" --headless --path client --export-debug "Android" build/chaos-idle-debug.apk
+          test -s client/build/chaos-idle-debug.apk
+          ls -l client/build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chaos-idle-debug-apk
+          path: client/build/chaos-idle-debug.apk
+          if-no-files-found: error

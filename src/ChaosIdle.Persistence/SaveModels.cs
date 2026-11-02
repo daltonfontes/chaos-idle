@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace ChaosIdle.Persistence
 {
     // Plain data objects: public get/set, no logic, IDs and rolled values only. They map 1:1 to
-    // the JSON payload, so any serializer (System.Text.Json here, Newtonsoft in Unity) can read
+    // the JSON payload, so any serializer (System.Text.Json here, or Newtonsoft) can read
     // them. Renaming a property is a schema change and needs a migration.
 
     public sealed class SaveData

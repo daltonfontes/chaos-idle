@@ -110,5 +110,5 @@ trading or paid rewards, Milestone 5 must move checkpoints and claims to the ser
   can't be unlocked yet.
 - **No saving yet.** Checkpoints and map progress aren't persisted; the save format is
   Milestone 5 work.
-- **Unity:** no client yet. App lifecycle (pause, resume, kill) should create the checkpoint
-  when the app goes to the background and resolve it when the app returns.
+- **Client:** the Godot client (`docs/client.md`) creates the checkpoint when the app goes
+  to the background and resolves it when the app returns.

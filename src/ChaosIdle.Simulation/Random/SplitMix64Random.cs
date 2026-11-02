@@ -2,7 +2,7 @@ namespace ChaosIdle.Simulation.Random
 {
     /// <summary>
     /// SplitMix64: tiny, fast, and fully specified, so a seed produces the same sequence on
-    /// .NET, Mono/IL2CPP (Unity), and a future server. System.Random gives no such guarantee.
+    /// every .NET runtime (desktop, Android, the server). System.Random gives no such guarantee.
     /// </summary>
     public sealed class SplitMix64Random : IRandom
     {

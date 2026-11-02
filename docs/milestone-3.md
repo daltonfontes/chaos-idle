@@ -90,7 +90,7 @@ safety and mana for speed. `Milestone3GateTests` checks all of this.
 
 ## Known limitations
 
-- **Unity:** no client yet (see `docs/milestone-2.md`).
+- **Client:** the Godot client (`client/`, see `docs/client.md`) doesn't show supports, uniques or filters yet.
 - **Scenarios:** only one trash pack and one boss. Map modifiers (Milestone 4) will test
   builds in more ways, for example elemental-heavy or fast-attacking enemies.
 - **Uniques:** the drop rate (1 in about 101 drops) is a placeholder for economy tuning.

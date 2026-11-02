@@ -139,7 +139,7 @@ rewrites a save, so either works as long as reads go through `SaveSerializer`.
 - **HTTPS, rate limiting** (`AddRateLimiter` per account and per IP), and request logging
   without tokens.
 - **The PostgreSQL store** and its migrations, and backups.
-- **Crash reporting.** Use a hosted service (Sentry, Firebase Crashlytics) from the Unity
+- **Crash reporting.** Use a hosted service (Sentry, Firebase Crashlytics) from the Godot
   client; this API doesn't replace it.
 - **Active-play authority.** Boss kills and tier unlocks still come from the client's save,
   checked only for consistency. If anything competitive or tradeable appears, active

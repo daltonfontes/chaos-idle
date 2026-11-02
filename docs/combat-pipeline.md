@@ -74,7 +74,7 @@ resistances and the life pool are the answer to spells.
 ## Randomness
 
 - All randomness goes through `IRandom`. The production implementation is `SplitMix64Random`.
-  It is fully specified, so a seed gives the same result on .NET, Unity, and a future
+  It is fully specified, so a seed gives the same result on every .NET runtime (desktop, Android) and on the
   server. A test pins its output sequence.
 - Each roll consumes a fixed number of random values whatever the outcome:
   - an attack hit uses 2 (weapon roll, crit);
