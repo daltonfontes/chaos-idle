@@ -222,7 +222,7 @@ public partial class CombatView : Control
 
     private float GroundY => Size.Y - 70;
     private Vector2 HeroAt => new(Size.X * 0.24f, GroundY);
-    private Vector2 EnemyAt => new(Size.X * 0.74f, GroundY);
+    private Vector2 EnemyAt => new(Size.X * 0.70f, GroundY);
 
     public override void _Draw()
     {
@@ -283,8 +283,8 @@ public partial class CombatView : Control
         DrawLine(new Vector2(37, -104), new Vector2(37, -46), tint(Cloth), 4);
         DrawSetTransform(Vector2.Zero, 0, Vector2.One);
 
-        Bar(font, p + new Vector2(-70, -196), 140, _heroShown / _fight!.HeroMaxLife, LifeRed,
-            $"{_fight.HeroName}", $"{Math.Max(0, Math.Round(_heroLife))}/{Math.Round(_fight.HeroMaxLife)}");
+        Bar(font, new Vector2(14, 50), BarWidth, _heroShown / _fight!.HeroMaxLife, LifeRed,
+            $"{_fight.HeroName}  {Math.Max(0, Math.Round(_heroLife))}/{Math.Round(_fight.HeroMaxLife)}");
     }
 
     private void DrawEnemy(Font font)
@@ -304,7 +304,7 @@ public partial class CombatView : Control
         float enter = (float)Math.Clamp((_now - _enemySpawnedAt) / 0.35, 0, 1);
         float lunge = Strength(Fx.Lunge, Side.Enemy);
         var p = EnemyAt + new Vector2((1 - enter) * 160 - lunge * 70, sink);
-        float s = _enemyBoss ? 1.55f : 1f;
+        float s = _enemyBoss ? 1.35f : 1f;
         var body = BodyColor(_enemyName);
         body.A = alpha;
         float hurt = Strength(Fx.Burst, Side.Enemy);
@@ -329,9 +329,8 @@ public partial class CombatView : Control
 
         DrawSetTransform(Vector2.Zero, 0, Vector2.One);
 
-        float top = _enemyBoss ? 220 : 150;
-        Bar(font, EnemyAt + new Vector2(-80, -top), 160, _enemyMax > 0 ? _enemyShown / _enemyMax : 0, EnemyBar,
-            _enemyName, $"{Math.Round(_enemyLife)}/{Math.Round(_enemyMax)}");
+        Bar(font, new Vector2(Size.X - 14 - BarWidth, 50), BarWidth, _enemyMax > 0 ? _enemyShown / _enemyMax : 0, EnemyBar,
+            $"{_enemyName}  {Math.Round(_enemyLife)}/{Math.Round(_enemyMax)}");
     }
 
     private void DrawEffects(Font font)
@@ -373,7 +372,7 @@ public partial class CombatView : Control
                 }
                 case Fx.Number:
                 {
-                    var anchor = e.At == Side.Hero ? HeroAt + new Vector2(0, -150) : enemyHit + new Vector2(0, -40);
+                    var anchor = e.At == Side.Hero ? HeroAt + new Vector2(0, -170) : enemyHit + new Vector2(0, -40);
                     var at = anchor + new Vector2(e.Offset, -60 * t);
                     var c = e.Color;
                     c.A = t < 0.7f ? 1 : 1 - (t - 0.7f) / 0.3f;
@@ -395,14 +394,16 @@ public partial class CombatView : Control
         }
     }
 
-    private void Bar(Font font, Vector2 at, float width, double fraction, Color fill, string name, string value)
+    private float BarWidth => Size.X * 0.42f;
+
+    /// <summary>Life bars sit in the top band, away from the floating numbers.</summary>
+    private void Bar(Font font, Vector2 at, float width, double fraction, Color fill, string caption)
     {
         float f = (float)Math.Clamp(fraction, 0, 1);
-        DrawString(font, at + new Vector2(0, -8), name, HorizontalAlignment.Left, width + 60, 20, Text);
-        DrawRect(new Rect2(at, new Vector2(width, 14)), LifeBack);
-        DrawRect(new Rect2(at, new Vector2(width * f, 14)), fill);
-        DrawRect(new Rect2(at, new Vector2(width, 14)), Muted, false, 1);
-        DrawString(font, at + new Vector2(0, 34), value, HorizontalAlignment.Left, width + 60, 18, Muted);
+        DrawRect(new Rect2(at, new Vector2(width, 16)), LifeBack);
+        DrawRect(new Rect2(at, new Vector2(width * f, 16)), fill);
+        DrawRect(new Rect2(at, new Vector2(width, 16)), Muted, false, 1);
+        DrawString(font, at + new Vector2(0, 40), caption, HorizontalAlignment.Left, width, 19, Text);
     }
 
     private void Centered(Font font, string text, Vector2 at, int size, Color color)
