@@ -71,6 +71,21 @@ jobs:
           "$GODOT" --headless --path client res://Smoke.tscn 2>&1 | tee smoke.log
           grep -q "SMOKE OK" smoke.log
 
+      - name: Screenshots (real renderer on a virtual display)
+        run: |
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri > /dev/null
+          export SCREENSHOT_DIR="$PWD/screenshots"
+          xvfb-run -a -s "-screen 0 720x1280x24" "$GODOT" --path client --rendering-driver opengl3 \
+            --rendering-method gl_compatibility --resolution 720x1280 res://Screenshots.tscn 2>&1 | tee shots.log
+          grep -q "SCREENSHOTS OK" shots.log
+          ls -l screenshots
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: screenshots/*.png
+          if-no-files-found: error
+
       - name: Export debug APK
         run: |
           set -o pipefail

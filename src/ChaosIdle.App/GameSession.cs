@@ -30,7 +30,7 @@ namespace ChaosIdle.App
     /// runs local offline progress around app pause/resume (the server version replaces this
     /// once accounts exist). Not thread-safe: call from the main thread.
     /// </summary>
-    public sealed class GameSession
+    public sealed partial class GameSession
     {
         public const string Slot = "main";
 

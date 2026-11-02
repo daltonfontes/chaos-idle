@@ -70,6 +70,28 @@ namespace ChaosIdle.Domain.Characters
             return SupportCompatibility.Compatible;
         }
 
+        /// <summary>
+        /// Every support link, including those of skills not in use right now (switching the main
+        /// skill keeps the old skill's supports for when it comes back).
+        /// </summary>
+        public IReadOnlyDictionary<string, IReadOnlyList<SupportDefinition>> AllSupportLinks =>
+            _supports.Where(kv => kv.Value.Count > 0)
+                .ToDictionary(kv => kv.Key, kv => (IReadOnlyList<SupportDefinition>)kv.Value.ToArray());
+
+        /// <summary>
+        /// Restores a saved link, also for a skill not in use. Applies the same compatibility rules
+        /// as <see cref="LinkSupport"/>.
+        /// </summary>
+        public SupportCompatibility RestoreSupport(SkillDefinition skill, SupportDefinition support)
+        {
+            var linked = SupportsFor(skill);
+            var check = support.CanLink(skill, linked.ToList());
+            if (check != SupportCompatibility.Compatible) return check;
+            if (!_supports.TryGetValue(skill.Id, out var list)) _supports[skill.Id] = list = new List<SupportDefinition>();
+            list.Add(support);
+            return SupportCompatibility.Compatible;
+        }
+
         public bool UnlinkSupport(SkillDefinition skill, SupportDefinition support) =>
             _supports.TryGetValue(skill.Id, out var list) && list.Remove(support);
 

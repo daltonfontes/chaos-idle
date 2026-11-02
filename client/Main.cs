@@ -21,6 +21,9 @@ public partial class Main : Control
     private Button _equip = null!;
     private Button _discard = null!;
     private string? _selectedItemId;
+    private TabContainer _tabs = null!;
+    private PassivesTab _passives = null!;
+    private SkillsTab _skillsTab = null!;
 
     public override void _Ready()
     {
@@ -75,9 +78,21 @@ public partial class Main : Control
         foreach (var side in new[] { "left", "right", "top", "bottom" }) margin.AddThemeConstantOverride("margin_" + side, 16);
         AddChild(margin);
 
-        var column = new VBoxContainer();
+        var tabs = _tabs = new TabContainer();
+        margin.AddChild(tabs);
+
+        var adventure = new ScrollContainer { Name = "Adventure", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        tabs.AddChild(adventure);
+        var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
         column.AddThemeConstantOverride("separation", 12);
-        margin.AddChild(column);
+        adventure.AddChild(column);
+
+        // The build tabs share the session; any change there refreshes the sheet and bag here.
+        _passives = new PassivesTab(() => _session, Refresh);
+        _skillsTab = new SkillsTab(() => _session, Refresh);
+        tabs.AddChild(Scrolling(_passives));
+        tabs.AddChild(Scrolling(_skillsTab));
+        tabs.TabChanged += _ => { _passives.Refresh(); _skillsTab.Refresh(); };
 
         column.AddChild(new Label { Text = "Chaos Idle", HorizontalAlignment = HorizontalAlignment.Center });
         _sheet = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
@@ -105,6 +120,34 @@ public partial class Main : Control
         actions.AddChild(_equip);
         actions.AddChild(_discard);
         column.AddChild(actions);
+    }
+
+    // ---- Hooks used by the Screenshots scene (CI) ----
+
+    public void ShowTab(int index) => _tabs.CurrentTab = index;
+
+    public void PlayFirstUnlocked()
+    {
+        if (_session == null) return;
+        foreach (var e in _session.Expeditions())
+        {
+            if (!e.Unlocked) continue;
+            Show(_session.RunExpedition(e.Id, DateTime.UtcNow));
+            Refresh();
+            return;
+        }
+    }
+
+    public void PreviewPassive(string id) => _passives.Preview(id);
+
+    public void PreviewSupport(string skillId, string supportId) => _skillsTab.Preview(skillId, supportId);
+
+    private static ScrollContainer Scrolling(Control content)
+    {
+        var scroll = new ScrollContainer { Name = content.Name, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        content.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        scroll.AddChild(content);
+        return scroll;
     }
 
     private void Refresh()
