@@ -31,6 +31,12 @@ namespace ChaosIdle.Domain.Profile
         /// <summary>The offline session running while the player is away, if any.</summary>
         public OfflineCheckpoint? Offline { get; private set; }
 
+        /// <summary>
+        /// The map (and modifiers) offline sessions farm. Null: the highest unlocked map, no
+        /// modifiers. Ignored if it is not unlocked when a session starts.
+        /// </summary>
+        public MapInstance? OfflineMap { get; set; }
+
         /// <summary>Incremented on every save; later used to detect sync conflicts.</summary>
         public long Revision { get; set; }
 

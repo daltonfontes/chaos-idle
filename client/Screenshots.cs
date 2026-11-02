@@ -27,15 +27,25 @@ public partial class Screenshots : Node
             main.ShowTab(0);
             await Capture(dir, "1-adventure.png");
 
-            main.ShowTab(1);
+            main.ShowTab(2);
             await Frames(2);
             main.PreviewPassive("pas.key.bastion");
             await Capture(dir, "2-passives.png");
 
-            main.ShowTab(2);
+            main.ShowTab(3);
             await Frames(2);
             main.PreviewSupport("skill.iron_cleave", "sup.heavy_impact");
             await Capture(dir, "3-skills.png");
+
+            main.ShowTab(1);
+            await Frames(2);
+            main.ChooseMap("map.sunken_causeway", "mapmod.savage", "mapmod.hardened");
+            await Capture(dir, "4-maps.png");
+
+            main.ShowTab(4);
+            await Frames(2);
+            main.SetLootFilter(ChaosIdle.App.FilterPreset.Strict, ChaosIdle.Domain.Items.ItemRarity.Magic);
+            await Capture(dir, "5-loot.png");
 
             GD.Print("SCREENSHOTS OK: " + dir);
         }

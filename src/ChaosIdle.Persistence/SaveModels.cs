@@ -13,6 +13,9 @@ namespace ChaosIdle.Persistence
         public MapProgressSave MapProgress { get; set; } = new MapProgressSave();
         public LootFilterSave LootFilter { get; set; } = new LootFilterSave();
         public OfflineSessionSave? Offline { get; set; }
+
+        /// <summary>Optional (added after schema v1 shipped; absent in older saves).</summary>
+        public MapChoiceSave? OfflineMap { get; set; }
         public List<string> ClaimedOfflineSessions { get; set; } = new List<string>();
     }
 
@@ -53,6 +56,12 @@ namespace ChaosIdle.Persistence
         public string AffixId { get; set; } = "";
         public int Tier { get; set; }
         public double Value { get; set; }
+    }
+
+    public sealed class MapChoiceSave
+    {
+        public string MapId { get; set; } = "";
+        public List<string> ModifierIds { get; set; } = new List<string>();
     }
 
     public sealed class MapProgressSave

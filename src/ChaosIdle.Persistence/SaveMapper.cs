@@ -43,6 +43,11 @@ namespace ChaosIdle.Persistence
             },
             LootFilter = ToSave(state.LootFilter),
             Offline = state.Offline == null ? null : ToSave(state.Offline),
+            OfflineMap = state.OfflineMap == null ? null : new MapChoiceSave
+            {
+                MapId = state.OfflineMap.Map.Id,
+                ModifierIds = state.OfflineMap.Modifiers.Select(m => m.Id).ToList(),
+            },
             ClaimedOfflineSessions = state.ClaimedSessions.ToList(),
         };
 
@@ -61,6 +66,16 @@ namespace ChaosIdle.Persistence
             }
 
             state.Restore(offline, save.ClaimedOfflineSessions);
+            if (save.OfflineMap != null)
+            {
+                var map = content.Map(save.OfflineMap.MapId);
+                var modifiers = save.OfflineMap.ModifierIds.Select(content.MapModifier).ToList();
+                if (map == null || modifiers.Any(m => m == null))
+                    warnings.Add("Your offline map choice refers to content that no longer exists; offline will use your highest map.");
+                else
+                    state.OfflineMap = new MapInstance { Map = map, Modifiers = modifiers! };
+            }
+
             return new LoadedGame(state, warnings);
         }
 
