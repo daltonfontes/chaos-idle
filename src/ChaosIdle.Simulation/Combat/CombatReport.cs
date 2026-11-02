@@ -68,6 +68,9 @@ namespace ChaosIdle.Simulation.Combat
 
         public IReadOnlyList<Diagnosis> Diagnoses { get; internal set; } = new List<Diagnosis>();
 
+        /// <summary>The fight beat by beat; empty unless <see cref="SimulationOptions.RecordTimeline"/> was set.</summary>
+        public IReadOnlyList<CombatBeat> Timeline { get; internal set; } = new List<CombatBeat>();
+
         /// <summary>Kill time of the first boss defeated, if any.</summary>
         public double? BossKillTime
         {
@@ -91,5 +94,8 @@ namespace ChaosIdle.Simulation.Combat
 
         public double MaxDurationSeconds { get; init; } = 300;
         public double RecentDamageWindowSeconds { get; init; } = 5;
+
+        /// <summary>Records every hit, miss, kill and death in <see cref="CombatReport.Timeline"/> (for replays).</summary>
+        public bool RecordTimeline { get; init; }
     }
 }

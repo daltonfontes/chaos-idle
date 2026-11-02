@@ -26,6 +26,8 @@ public partial class Main : Control
     private SkillsTab _skillsTab = null!;
     private MapsTab _mapsTab = null!;
     private LootTab _lootTab = null!;
+    private FightPanel _fight = null!;
+    private ScrollContainer _heroScroll = null!;
 
     public override void _Ready()
     {
@@ -83,7 +85,7 @@ public partial class Main : Control
         var tabs = _tabs = new TabContainer();
         margin.AddChild(tabs);
 
-        var adventure = new ScrollContainer { Name = "Hero", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        var adventure = _heroScroll = new ScrollContainer { Name = "Hero", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         tabs.AddChild(adventure);
         var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
         column.AddThemeConstantOverride("separation", 12);
@@ -94,7 +96,8 @@ public partial class Main : Control
         {
             Show(lines);
             Refresh();
-            _tabs.CurrentTab = 0; // read the report on the Hero tab
+            _tabs.CurrentTab = 0; // watch the fight and read the report on the Hero tab
+            PlayLastFight();
         });
         _passives = new PassivesTab(() => _session, Refresh) { Name = "Tree" };
         _skillsTab = new SkillsTab(() => _session, Refresh);
@@ -106,6 +109,8 @@ public partial class Main : Control
         tabs.TabChanged += _ => { _mapsTab.Refresh(); _passives.Refresh(); _skillsTab.Refresh(); _lootTab.Refresh(); };
 
         column.AddChild(new Label { Text = "Chaos Idle", HorizontalAlignment = HorizontalAlignment.Center });
+        _fight = new FightPanel();
+        column.AddChild(_fight);
         _sheet = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         column.AddChild(_sheet);
 
@@ -145,8 +150,31 @@ public partial class Main : Control
             if (!e.Unlocked) continue;
             Show(_session.RunExpedition(e.Id, DateTime.UtcNow));
             Refresh();
+            PlayLastFight();
             return;
         }
+    }
+
+    /// <summary>
+    /// A still frame of the last fight, a moment after a beat that happened
+    /// <paramref name="secondsIn"/> seconds into the boss fight (or the last fight reached).
+    /// </summary>
+    public void FreezeFight(bool boss, double secondsIn)
+    {
+        var fight = _session?.LastFight;
+        if (fight == null) return;
+        int stage = boss ? fight.Stages.Count - 1 : 0;
+        double target = fight.Stages[stage].StartTime + secondsIn;
+        double at = target;
+        foreach (var b in fight.Beats)
+        {
+            if (b.Time < target || b.Kind != ChaosIdle.Simulation.Combat.BeatKind.PlayerHit) continue;
+            at = b.Time + 0.5; // the bolt has landed and its number is rising
+            break;
+        }
+
+        _fight.Freeze(fight, Math.Min(at, fight.DurationSeconds));
+        _heroScroll.ScrollVertical = 0;
     }
 
     public void PreviewPassive(string id) => _passives.Preview(id);
@@ -156,6 +184,13 @@ public partial class Main : Control
     public void SetLootFilter(ChaosIdle.App.FilterPreset preset, ChaosIdle.Domain.Items.ItemRarity minimum) => _lootTab.Set(preset, minimum);
 
     public void PreviewSupport(string skillId, string supportId) => _skillsTab.Preview(skillId, supportId);
+
+    private void PlayLastFight()
+    {
+        if (_session?.LastFight == null) return;
+        _fight.Play(_session.LastFight);
+        Callable.From(() => _heroScroll.ScrollVertical = 0).CallDeferred();
+    }
 
     private static ScrollContainer Scrolling(Control content)
     {

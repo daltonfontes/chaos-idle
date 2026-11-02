@@ -25,7 +25,11 @@ public partial class Screenshots : Node
 
             main.PlayFirstUnlocked();
             main.ShowTab(0);
+            main.FreezeFight(boss: false, secondsIn: 3);
             await Capture(dir, "1-adventure.png");
+
+            main.FreezeFight(boss: true, secondsIn: 12);
+            await Capture(dir, "6-fight-boss.png");
 
             main.ShowTab(2);
             await Frames(2);

@@ -12,7 +12,8 @@ Godot because:
 | Piece | What it does |
 |---|---|
 | `src/ChaosIdle.App` (`GameSession`) | Everything the screens do, with no Godot types: load or create the save, the character sheet, expeditions (active, boss included, tier unlocks), the bag (describe and compare, equip, discard), and local offline progress on pause/resume. Unit-tested in `GameSessionTests`. |
-| `client/Main.cs` + `Main.tscn` | The main screen, built in code (portrait 720×1280, larger font), with five tabs: **Hero** (character sheet, report, bag), **Maps**, **Tree**, **Skills**, **Loot**. |
+| `client/Main.cs` + `Main.tscn` | The main screen, built in code (portrait 720×1280, larger font), with five tabs: **Hero** (the fight replay, character sheet, report, bag), **Maps**, **Tree**, **Skills**, **Loot**. |
+| `client/CombatView.cs` | **Fight replay** at the top of Hero. After each map run it plays the run back from the beats the simulator recorded (`SimulationOptions.RecordTimeline`, kept in `GameSession.LastFight`): the hero and the current enemy, life bars, skill bolts coloured by element (triggered skills arc), enemy lunges, damage numbers (crits bigger, in gold), miss / evade / block, kills, and the result. Play/Pause, speed 1×/2×/4×, and "Skip to boss". It only shows what the simulation decided; recording does not change the fight (tested). All art is plain shapes drawn in code. |
 | `client/MapsLootTabs.cs` | **Maps:** pick a map and up to three modifiers; the preview lists packs, boss, each modifier's risk and reward, the total loot bonus, and an estimate from 20 quick simulations with your build ("boss beaten 60%", main danger). "Run map" runs it and shows the report on Hero; "Farm offline here" sets the map offline sessions use. **Loot:** preset (show everything / focused on your build / strict), a minimum rarity to pick up (uniques always kept), the rules in words in the order they're checked, and your bag as the filter would treat it. |
 | `client/TreeCanvas.cs` | Draws the shared passive tree: drag to move, pinch / mouse wheel / − + buttons to zoom. Filled = taken, thick ring = available, blue = the selected path, X = another class's start, double ring = keystone. |
 | `client/BuildTabs.cs` | **Passives:** the drawn tree; tapping any node shows the shortest path to it, its cost and the combined character-sheet change, with "Take path (N points)" and "Refund". **Skills:** choose the main skill, see each skill's supports and free sockets; tapping a support previews its effect or explains why it doesn't fit. |
@@ -59,6 +60,5 @@ release.
 ## Next steps
 
 - Editing single loot filter rules (today: presets plus a minimum rarity).
-- Combat visuals by replaying a finished `CombatReport`, so visuals can't change outcomes.
-  This needs a per-event timeline added to the report.
+- Fight replay: sprites and sounds instead of shapes; replays of offline runs.
 - Sign-in and cloud saves against the server.
