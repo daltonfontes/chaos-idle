@@ -58,6 +58,7 @@ namespace ChaosIdle.Simulation.Combat
             private readonly Queue<DamageTakenEvent> _recent = new Queue<DamageTakenEvent>();
 
             private double _time;
+            private readonly List<CombatBeat>? _timeline;
             private double _life;
             private double _mana;
             private double _playerNext;
@@ -76,6 +77,7 @@ namespace ChaosIdle.Simulation.Combat
                 _encounter = encounter;
                 _options = options;
                 _rng = new SplitMix64Random(seed);
+                _timeline = options.RecordTimeline ? new List<CombatBeat>() : null;
                 _stats = build.ComputeStats();
                 _defence = DefenceStats.From(_stats);
 
@@ -117,6 +119,7 @@ namespace ChaosIdle.Simulation.Combat
                     if (next > _options.MaxDurationSeconds)
                     {
                         AdvanceTo(_options.MaxDurationSeconds);
+                        Beat(BeatKind.TimedOut, _enemy.Name);
                         outcome = CombatOutcome.Timeout;
                         break;
                     }
@@ -136,6 +139,7 @@ namespace ChaosIdle.Simulation.Combat
                     if (_enemyLife <= 0)
                     {
                         _kills.Add(new EnemyKill(_enemy.Id, _enemy.Name, _enemy.IsBoss, _enemySpawnedAt, _time));
+                        Beat(BeatKind.EnemyKilled, _enemy.Name);
                         if (_enemyIndex + 1 >= _encounter.Enemies.Count)
                         {
                             outcome = CombatOutcome.Victory;
@@ -147,6 +151,7 @@ namespace ChaosIdle.Simulation.Combat
 
                     if (_life <= 0)
                     {
+                        Beat(BeatKind.PlayerDied, _report.KillingBlow?.AttackName ?? "");
                         outcome = CombatOutcome.Death;
                         break;
                     }
@@ -166,6 +171,14 @@ namespace ChaosIdle.Simulation.Combat
 
                 // Abilities with a cooldown start on cooldown: big attacks need a wind-up.
                 _enemyAttackReadyAt = _enemy.Attacks.Select(a => _time + a.CooldownSeconds).ToArray();
+                Beat(BeatKind.EnemySpawned, _enemy.Name);
+            }
+
+            private void Beat(BeatKind kind, string label, double amount = 0, bool critical = false,
+                bool triggered = false, DamageType element = DamageType.Physical)
+            {
+                _timeline?.Add(new CombatBeat(_time, kind, label, amount, critical, triggered, element,
+                    Math.Max(0, _life), Math.Max(0, _enemyLife), _enemy.MaxLife, _enemy.IsBoss));
             }
 
             private void AdvanceTo(double time)
@@ -194,16 +207,17 @@ namespace ChaosIdle.Simulation.Combat
                     double wait = _manaRegen > 0 ? (_manaCost - _mana) / _manaRegen : double.PositiveInfinity;
                     _report.TimeOutOfMana += Math.Min(wait, _options.MaxDurationSeconds - _time);
                     _playerNext = _time + wait;
+                    Beat(BeatKind.OutOfMana, skill.Name);
                     return;
                 }
 
                 _mana = Math.Max(0, _mana - _manaCost);
                 _report.PrimarySkillUses++;
-                HitEnemy(skill);
+                HitEnemy(skill, triggered: false);
                 _playerNext = _time + _actionTime;
             }
 
-            private void HitEnemy(SkillDefinition skill)
+            private void HitEnemy(SkillDefinition skill, bool triggered)
             {
                 // Offence uses the skill's own stat block (character stats + its supports).
                 var stats = _skillStats[skill.Id];
@@ -223,6 +237,11 @@ namespace ChaosIdle.Simulation.Combat
                     _life += leech;
                     _report.LifeLeeched += leech;
                 }
+
+                if (result.Outcome == HitOutcome.Evaded)
+                    Beat(BeatKind.PlayerMissed, skill.Name, 0, false, triggered, hit.Damage.Dominant());
+                else
+                    Beat(BeatKind.PlayerHit, skill.Name, dealt, hit.IsCritical, triggered, hit.Damage.Dominant());
             }
 
             private void EnemyAct()
@@ -248,6 +267,7 @@ namespace ChaosIdle.Simulation.Combat
                 {
                     case HitOutcome.Evaded:
                         _report.HitsEvaded++;
+                        Beat(BeatKind.PlayerEvaded, attack.Name);
                         return;
                     case HitOutcome.Blocked:
                         _report.HitsBlocked++;
@@ -257,6 +277,8 @@ namespace ChaosIdle.Simulation.Combat
                             _life += gain;
                             _report.LifeGainedOnBlock += gain;
                         }
+
+                        Beat(BeatKind.PlayerBlocked, attack.Name, gain);
 
                         FireTriggers(SkillTrigger.OnBlock);
                         return;
@@ -280,6 +302,8 @@ namespace ChaosIdle.Simulation.Combat
                 {
                     _report.KillingBlow = evt;
                 }
+
+                Beat(BeatKind.EnemyHit, attack.Name, result.Taken.Total, false, false, result.Taken.Dominant());
             }
 
             private void FireTriggers(SkillTrigger trigger)
@@ -294,7 +318,7 @@ namespace ChaosIdle.Simulation.Combat
 
                     _triggerReadyAt[i] = _time + DamagePipeline.Cooldown(skill, _skillStats[skill.Id]);
                     _report.TriggeredSkillUses++;
-                    HitEnemy(skill);
+                    HitEnemy(skill, triggered: true);
                 }
             }
 
@@ -308,6 +332,7 @@ namespace ChaosIdle.Simulation.Combat
                 _report.CurrentEnemyLifeFraction = outcome == CombatOutcome.Victory ? 0 : Math.Max(0, _enemyLife) / _enemy.MaxLife;
                 _report.RecentDamageTaken = _recent.Where(e => e.Time >= _time - _options.RecentDamageWindowSeconds).ToList();
                 _report.Diagnoses = FailureAnalyzer.Analyze(_report, _defence);
+                if (_timeline != null) _report.Timeline = _timeline;
                 return _report;
             }
         }

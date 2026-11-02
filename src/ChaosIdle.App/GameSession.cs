@@ -115,7 +115,8 @@ namespace ChaosIdle.App
             var map = instance.Map;
             if (!State.Progress.CanRun(map)) return new[] { $"{map.Name} is locked: defeat the tier {map.Tier - 1} boss first." };
 
-            var report = _runner.RunMap(Character.ToBuild(), Character.Id, instance, includeBoss: true, _seeds());
+            var report = _runner.RunMap(Character.ToBuild(), Character.Id, instance, includeBoss: true, _seeds(), ReplayOptions);
+            RememberFight(report, map.Name);
             var lines = ReportText.Expedition(report).ToList();
             lines.Add(ReportText.Claim(report.ClaimLoot(Character.Inventory, State.LootFilter)));
 
