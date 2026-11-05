@@ -7,6 +7,24 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: chaosidle
+          POSTGRES_PASSWORD: chaosidle
+          POSTGRES_DB: chaosidle
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chaosidle"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # The PostgreSQL tests must run here: a missing database fails instead of skipping.
+      CHAOSIDLE_TEST_POSTGRES: Host=localhost;Username=chaosidle;Password=chaosidle;Database=chaosidle
+      CHAOSIDLE_REQUIRE_POSTGRES: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -18,3 +36,16 @@ jobs:
       - run: dotnet run --project src/ChaosIdle.Cli --configuration Release -- builds 50 1
       - run: dotnet run --project src/ChaosIdle.Cli --configuration Release -- offline 10 1
       - run: dotnet run --project src/ChaosIdle.Cli --configuration Release -- save ${{ runner.temp }}/saves
+      - name: Server starts on PostgreSQL and migrates
+        env:
+          ConnectionStrings__Postgres: Host=localhost;Username=chaosidle;Password=chaosidle;Database=chaosidle
+          ASPNETCORE_URLS: http://localhost:5080
+        run: |
+          dotnet run --project src/ChaosIdle.Server --configuration Release --no-launch-profile &
+          server=$!
+          for i in $(seq 1 60); do curl -sf http://localhost:5080/health && break; sleep 1; done
+          curl -sf http://localhost:5080/health | grep -q '"store":"postgres"'
+          token=$(curl -sf -X POST http://localhost:5080/v1/accounts | sed -E 's/.*"token":"([^"]+)".*/\1/')
+          psql "postgresql://chaosidle:chaosidle@localhost/chaosidle" -tc "select count(*) from accounts" | grep -q 1
+          psql "postgresql://chaosidle:chaosidle@localhost/chaosidle" -tc "select version from schema_migrations"
+          kill $server

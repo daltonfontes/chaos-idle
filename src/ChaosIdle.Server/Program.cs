@@ -8,7 +8,12 @@ using ChaosIdle.Simulation.Offline;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSingleton<IServerStore, InMemoryServerStore>();
+// PostgreSQL when a connection string is configured (ConnectionStrings__Postgres), else in memory.
+string? postgres = builder.Configuration.GetConnectionString("Postgres");
+if (string.IsNullOrWhiteSpace(postgres))
+    builder.Services.AddSingleton<IServerStore, InMemoryServerStore>();
+else
+    builder.Services.AddSingleton<IServerStore>(_ => PostgresServerStore.Open(postgres));
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<ContentRegistry>(ContentDatabase.Default);
 builder.Services.AddSingleton(new SaveSerializer());
@@ -19,6 +24,7 @@ builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 app.UseExceptionHandler();
+app.Services.GetRequiredService<IServerStore>(); // connect and migrate at startup, not on the first request
 app.MapGameApi();
 app.Run();
 
@@ -46,7 +52,7 @@ namespace ChaosIdle.Server
 
         public static void MapGameApi(this WebApplication app)
         {
-            app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+            app.MapGet("/health", (IServerStore store) => Results.Ok(new { status = "ok", store = store is PostgresServerStore ? "postgres" : "memory" }));
 
             app.MapPost("/v1/accounts", (IServerStore store, TimeProvider time) =>
             {

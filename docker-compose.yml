@@ -1,0 +1,17 @@
+# Local PostgreSQL for the server and its tests:
+#   docker compose up -d
+#   export CHAOSIDLE_TEST_POSTGRES="Host=localhost;Username=chaosidle;Password=chaosidle;Database=chaosidle"
+#   ConnectionStrings__Postgres="$CHAOSIDLE_TEST_POSTGRES" dotnet run --project src/ChaosIdle.Server
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: chaosidle
+      POSTGRES_PASSWORD: chaosidle
+      POSTGRES_DB: chaosidle
+    ports:
+      - "5432:5432"
+    volumes:
+      - chaosidle-pg:/var/lib/postgresql/data
+volumes:
+  chaosidle-pg:
