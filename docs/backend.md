@@ -1,8 +1,8 @@
 # Backend (Milestone 5, part 2)
 
 `src/ChaosIdle.Server` is an ASP.NET Core minimal API: a modular monolith on the same domain
-and save code as the client. It runs on an in-memory store today. A PostgreSQL store is the
-next step; the interface and schema are below.
+and save code as the client. It stores data in PostgreSQL when a connection string is set,
+and in memory otherwise (tests and quick local runs).
 
 **Principle:** the client owns nothing that pays out rewards. The server owns:
 - time;
@@ -12,8 +12,29 @@ next step; the interface and schema are below.
 
 ## Run it
 
+In memory (data is lost when it stops):
+
 ```bash
 dotnet run --project src/ChaosIdle.Server --urls http://127.0.0.1:5077
+```
+
+On PostgreSQL: start the database from `docker-compose.yml`, then point the server at it.
+The server applies pending migrations at startup. `GET /health` reports `"store": "postgres"`.
+
+```bash
+docker compose up -d
+```
+
+```bash
+ConnectionStrings__Postgres="Host=localhost;Username=chaosidle;Password=chaosidle;Database=chaosidle" dotnet run --project src/ChaosIdle.Server --urls http://127.0.0.1:5077
+```
+
+The PostgreSQL tests run when `CHAOSIDLE_TEST_POSTGRES` holds a connection string for a role
+that may create databases. Each test gets a fresh database and drops it afterwards. Without the
+variable they are skipped; CI sets `CHAOSIDLE_REQUIRE_POSTGRES=1`, so there they always run.
+
+```bash
+CHAOSIDLE_TEST_POSTGRES="Host=localhost;Username=chaosidle;Password=chaosidle;Database=chaosidle" dotnet test
 ```
 
 ## API
@@ -84,53 +105,41 @@ Milestone 4 local checks remain for playing without a connection.
 
 ## Store and PostgreSQL
 
-`IServerStore` hides storage. Its one non-obvious requirement is that `WithAccountLock`
-serializes writes for one account. That is what makes claims pay once and keeps uploads and
-session starts consistent. In PostgreSQL, run each call in a transaction that first takes
-`SELECT … FROM accounts WHERE id = $1 FOR UPDATE`.
+`IServerStore` hides storage. It has two implementations: `InMemoryServerStore` and
+`PostgresServerStore` (`src/ChaosIdle.Server/PostgresStore.cs`, on Npgsql). Both pass the same
+tests. `StoreContractTests` covers the store itself, and every HTTP test in `ServerTests` runs
+again on PostgreSQL as `PostgresServerTests`.
 
-Suggested schema:
+**Locking.** The one non-obvious requirement is that `WithAccountLock` serializes writes for one
+account. That is what makes claims pay once and keeps uploads and session starts consistent.
+The PostgreSQL store runs the whole action in one transaction:
+1. It first runs `select 1 from accounts where id = $1 for update`.
+2. Every store call inside the action reuses that transaction (carried in an `AsyncLocal`).
 
-```sql
-create table accounts (
-  id text primary key,
-  token_hash text not null unique,
-  created_at timestamptz not null
-);
+So the lock holds across server instances, and a failure rolls back every write the action made.
+Locking the same account again inside the action is allowed; locking a second account
+inside it is refused.
 
-create table cloud_saves (
-  account_id text not null references accounts(id),
-  slot text not null,
-  revision bigint not null,
-  body jsonb not null,            -- the save envelope as uploaded/written
-  updated_at timestamptz not null,
-  primary key (account_id, slot)
-);
+**Migrations.** SQL files in `src/ChaosIdle.Server/Migrations/` (named `NNNN_name.sql`) are
+embedded in the server. At startup they are applied in order, each in its own transaction, and
+recorded in `schema_migrations`. A PostgreSQL advisory lock stops two instances starting at
+once from applying a migration twice. To change the schema, add a new file; never edit one
+that has shipped.
 
-create table offline_sessions (
-  id text primary key,
-  account_id text not null references accounts(id),
-  slot text not null,
-  session jsonb not null,          -- OfflineSessionSave: map, modifiers, start, seed, frozen loadout
-  started_at timestamptz not null,
-  claim_key text,
-  claim_response jsonb,
-  claimed_at timestamptz
-);
-create unique index one_open_session on offline_sessions (account_id, slot) where claimed_at is null;
+**Schema** (`0001_initial.sql`):
+- `accounts`: `id`, `token_hash` (unique), `created_at`.
+- `cloud_saves`: primary key `(account_id, slot)`, `revision`, `body`, `updated_at`. `body` is
+  **text**, not `jsonb`, so the save envelope keeps its exact bytes and its checksum still
+  matches.
+- `offline_sessions`:
+  - `id`, `account_id`, `slot`;
+  - `session` (`jsonb`), `started_at`;
+  - `claim_key`, `claim_response`, `claimed_at`.
 
-create table telemetry_events (
-  id bigserial primary key,
-  account_id text not null,
-  name text not null,
-  at timestamptz not null,
-  properties jsonb not null
-);
-```
-
-Store the save body as **text** if the checksum must be re-verified byte for byte;
-`jsonb` normalizes whitespace and key order. The server re-serializes before it ever
-rewrites a save, so either works as long as reads go through `SaveSerializer`.
+  A partial unique index allows **at most one unclaimed session per slot**, a database-level
+  backstop to the service's own check.
+- `telemetry_events`: `id` (bigserial), `account_id`, `name`, `at`, `properties` (`jsonb`), and
+  an index on `(account_id, at)`.
 
 ## Not done yet (before an external beta)
 
@@ -138,7 +147,8 @@ rewrites a save, so either works as long as reads go through `SaveSerializer`.
   Device tokens are a placeholder and are lost with the device.
 - **HTTPS, rate limiting** (`AddRateLimiter` per account and per IP), and request logging
   without tokens.
-- **The PostgreSQL store** and its migrations, and backups.
+- **Backups** of the PostgreSQL database (managed service snapshots or `pg_dump`), and a
+  retention policy for telemetry.
 - **Crash reporting.** Use a hosted service (Sentry, Firebase Crashlytics) from the Godot
   client; this API doesn't replace it.
 - **Active-play authority.** Boss kills and tier unlocks still come from the client's save,

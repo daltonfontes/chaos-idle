@@ -27,6 +27,13 @@ public sealed class ManualTime : TimeProvider
 
 public sealed class ServerFactory : WebApplicationFactory<Program>
 {
+    private readonly PostgresTestDatabase? _database;
+
+    public ServerFactory() { }
+
+    /// <summary>The same API on a fresh PostgreSQL database, dropped when the factory is disposed.</summary>
+    public ServerFactory(PostgresTestDatabase database) => _database = database;
+
     public ManualTime Time { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) =>
@@ -34,15 +41,31 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
         {
             s.RemoveAll<TimeProvider>();
             s.AddSingleton<TimeProvider>(Time);
+            if (_database != null)
+            {
+                s.RemoveAll<IServerStore>();
+                s.AddSingleton<IServerStore>(_ => PostgresServerStore.Open(_database.ConnectionString));
+            }
         });
 
     public IServerStore Store => Services.GetRequiredService<IServerStore>();
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing); // disposes the store first, closing its connections
+        if (disposing) _database?.Dispose();
+    }
 }
 
+/// <summary>The HTTP API end to end on the in-memory store; <see cref="PostgresServerTests"/> runs every test again on PostgreSQL.</summary>
 public class ServerTests : IDisposable
 {
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
-    private readonly ServerFactory _factory = new();
+    private readonly ServerFactory _factory;
+
+    public ServerTests() : this(new ServerFactory()) { }
+
+    protected ServerTests(ServerFactory factory) => _factory = factory;
     private readonly SaveSerializer _serializer = new();
 
     public void Dispose() => _factory.Dispose();
@@ -90,14 +113,14 @@ public class ServerTests : IDisposable
         return (loaded.State, envelope.Revision);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Health_is_public()
     {
         var res = await _factory.CreateClient().GetAsync("/health");
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Game_endpoints_need_a_valid_token()
     {
         var anon = _factory.CreateClient();
@@ -106,7 +129,7 @@ public class ServerTests : IDisposable
         Assert.Equal(HttpStatusCode.Unauthorized, (await anon.GetAsync("/v1/saves/main")).StatusCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Tokens_are_stored_only_as_hashes()
     {
         var anon = _factory.CreateClient();
@@ -115,7 +138,7 @@ public class ServerTests : IDisposable
         Assert.Equal(account.AccountId, _factory.Store.FindAccountByTokenHash(Auth.Hash(account.Token))!.Id);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Upload_download_and_optimistic_concurrency()
     {
         var client = await SignedIn();
@@ -140,7 +163,7 @@ public class ServerTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, (await Put(client, Text(state, 7), 3)).StatusCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Saves_are_private_to_their_account()
     {
         var a = await SignedIn();
@@ -149,7 +172,7 @@ public class ServerTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, (await b.GetAsync("/v1/saves/main")).StatusCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Broken_or_impossible_saves_are_rejected()
     {
         var client = await SignedIn();
@@ -172,7 +195,7 @@ public class ServerTests : IDisposable
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, huge.StatusCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Offline_session_runs_on_server_time_and_pays_into_the_cloud_save()
     {
         var client = await SignedIn();
@@ -208,7 +231,7 @@ public class ServerTests : IDisposable
         Assert.Equal(claimed.KeptItemIds, afterClaim.Character.Inventory.Items.Select(i => i.Id));
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Claims_are_idempotent_and_pay_only_once()
     {
         var client = await SignedIn();
@@ -229,7 +252,7 @@ public class ServerTests : IDisposable
         Assert.Equal(3, revision); // paid exactly once
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Concurrent_claims_pay_exactly_once()
     {
         var client = await SignedIn();
@@ -245,7 +268,7 @@ public class ServerTests : IDisposable
         Assert.Equal(3, revision);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Another_account_cannot_claim_a_session()
     {
         var owner = await SignedIn();
@@ -256,7 +279,7 @@ public class ServerTests : IDisposable
         Assert.Equal(HttpStatusCode.NotFound, (await Claim(thief, started.SessionId, "x")).StatusCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Locked_tiers_and_unknown_maps_are_refused()
     {
         var client = await SignedIn();
@@ -267,7 +290,7 @@ public class ServerTests : IDisposable
             new StartOfflineRequest(Maps.SunkenCauseway.Id, new[] { MapModifiers.Savage.Id, MapModifiers.Savage.Id }))).StatusCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Uploads_cannot_drop_or_forge_offline_sessions()
     {
         var client = await SignedIn();
@@ -290,7 +313,7 @@ public class ServerTests : IDisposable
         Assert.Equal(HttpStatusCode.UnprocessableEntity, (await Put(other, Text(forged, 1), 0)).StatusCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Telemetry_is_validated_and_stored()
     {
         var client = await SignedIn();

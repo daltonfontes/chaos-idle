@@ -31,10 +31,11 @@ automatic combat, and bounded offline expeditions.
     a reload. See [`docs/save-format.md`](docs/save-format.md).
   - Done: backend. It's an ASP.NET Core API with device-token accounts, cloud saves
     (optimistic concurrency, full content validation), offline sessions started and claimed
-    on the server with server time and idempotent claims, and telemetry intake. It runs on
-    an in-memory store. See [`docs/backend.md`](docs/backend.md).
-  - Next: the PostgreSQL store, real sign-in, rate limiting and HTTPS, crash reporting in
-    the client.
+    on the server with server time and idempotent claims, and telemetry intake. It stores
+    data in PostgreSQL (with migrations; every API test also runs on PostgreSQL in CI), or in
+    memory for quick runs. See [`docs/backend.md`](docs/backend.md).
+  - Next: real sign-in, rate limiting and HTTPS, database backups, crash reporting in the
+    client.
 
 ## Layout
 
