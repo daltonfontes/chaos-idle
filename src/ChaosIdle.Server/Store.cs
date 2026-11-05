@@ -1,6 +1,12 @@
 namespace ChaosIdle.Server;
 
-public sealed record Account(string Id, string TokenHash, DateTimeOffset CreatedAt);
+public sealed record Account(string Id, DateTimeOffset CreatedAt);
+
+/// <summary>A device's sign-in. Only the SHA-256 hash of the token is stored; one account can have many.</summary>
+public sealed record DeviceToken(string Hash, string AccountId, DateTimeOffset CreatedAt, DateTimeOffset? RevokedAt = null);
+
+/// <summary>A platform identity (e.g. Google, Apple) linked to an account: <paramref name="Subject"/> is the provider's stable user id.</summary>
+public sealed record LinkedIdentity(string Provider, string Subject, string AccountId, string? Email, DateTimeOffset LinkedAt);
 
 public sealed record CloudSave(string AccountId, string Slot, long Revision, string Text, DateTimeOffset UpdatedAt);
 
@@ -20,7 +26,22 @@ public sealed record TelemetryEvent(string AccountId, string Name, DateTimeOffse
 public interface IServerStore
 {
     void AddAccount(Account account);
+    Account? FindAccount(string accountId);
+
+    void AddToken(DeviceToken token);
+    /// <summary>The account for a token that exists and is not revoked.</summary>
     Account? FindAccountByTokenHash(string tokenHash);
+    void RevokeToken(string tokenHash, DateTimeOffset at);
+    /// <returns>How many tokens were revoked.</returns>
+    int RevokeAllTokens(string accountId, DateTimeOffset at);
+
+    LinkedIdentity? FindIdentity(string provider, string subject);
+    IReadOnlyList<LinkedIdentity> IdentitiesOf(string accountId);
+    /// <summary>
+    /// Links an identity. Returns false, changing nothing, if that identity is already linked to
+    /// any account or the account already has an identity from that provider.
+    /// </summary>
+    bool TryLinkIdentity(LinkedIdentity identity);
 
     CloudSave? GetSave(string accountId, string slot);
     void PutSave(CloudSave save);
@@ -40,15 +61,59 @@ public interface IServerStore
 public sealed class InMemoryServerStore : IServerStore
 {
     private readonly object _gate = new();
-    private readonly Dictionary<string, Account> _accountsByHash = new();
+    private readonly Dictionary<string, Account> _accounts = new();
+    private readonly Dictionary<string, DeviceToken> _tokens = new();
+    private readonly Dictionary<(string, string), LinkedIdentity> _identities = new();
     private readonly Dictionary<(string, string), CloudSave> _saves = new();
     private readonly Dictionary<string, OfflineSessionRecord> _sessions = new();
     private readonly List<TelemetryEvent> _telemetry = new();
     private readonly Dictionary<string, object> _accountLocks = new();
 
-    public void AddAccount(Account account) { lock (_gate) _accountsByHash.Add(account.TokenHash, account); }
+    public void AddAccount(Account account) { lock (_gate) _accounts.Add(account.Id, account); }
 
-    public Account? FindAccountByTokenHash(string tokenHash) { lock (_gate) return _accountsByHash.GetValueOrDefault(tokenHash); }
+    public Account? FindAccount(string accountId) { lock (_gate) return _accounts.GetValueOrDefault(accountId); }
+
+    public void AddToken(DeviceToken token) { lock (_gate) _tokens.Add(token.Hash, token); }
+
+    public Account? FindAccountByTokenHash(string tokenHash)
+    {
+        lock (_gate)
+            return _tokens.TryGetValue(tokenHash, out var t) && t.RevokedAt == null ? _accounts.GetValueOrDefault(t.AccountId) : null;
+    }
+
+    public void RevokeToken(string tokenHash, DateTimeOffset at)
+    {
+        lock (_gate)
+            if (_tokens.TryGetValue(tokenHash, out var t) && t.RevokedAt == null) _tokens[tokenHash] = t with { RevokedAt = at };
+    }
+
+    public int RevokeAllTokens(string accountId, DateTimeOffset at)
+    {
+        lock (_gate)
+        {
+            var live = _tokens.Values.Where(t => t.AccountId == accountId && t.RevokedAt == null).ToList();
+            foreach (var t in live) _tokens[t.Hash] = t with { RevokedAt = at };
+            return live.Count;
+        }
+    }
+
+    public LinkedIdentity? FindIdentity(string provider, string subject) { lock (_gate) return _identities.GetValueOrDefault((provider, subject)); }
+
+    public IReadOnlyList<LinkedIdentity> IdentitiesOf(string accountId)
+    {
+        lock (_gate) return _identities.Values.Where(i => i.AccountId == accountId).OrderBy(i => i.Provider).ToList();
+    }
+
+    public bool TryLinkIdentity(LinkedIdentity identity)
+    {
+        lock (_gate)
+        {
+            if (_identities.ContainsKey((identity.Provider, identity.Subject))) return false;
+            if (_identities.Values.Any(i => i.AccountId == identity.AccountId && i.Provider == identity.Provider)) return false;
+            _identities.Add((identity.Provider, identity.Subject), identity);
+            return true;
+        }
+    }
 
     public CloudSave? GetSave(string accountId, string slot) { lock (_gate) return _saves.GetValueOrDefault((accountId, slot)); }
 

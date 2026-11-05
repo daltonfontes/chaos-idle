@@ -17,6 +17,8 @@ public enum Outcome
     Conflict,
     Forbidden,
     Invalid,
+    Unauthorized,
+    Unavailable,
 }
 
 public sealed record ServiceResult<T>(Outcome Outcome, T? Value, string? Error = null, object? Details = null);

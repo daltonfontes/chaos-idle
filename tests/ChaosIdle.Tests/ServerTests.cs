@@ -41,6 +41,8 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
         {
             s.RemoveAll<TimeProvider>();
             s.AddSingleton<TimeProvider>(Time);
+            s.RemoveAll<IIdentityVerifier>();
+            s.AddSingleton<IIdentityVerifier>(_ => TestIdentityProvider.Verifier(Time)); // Google on, signed by the test key
             if (_database != null)
             {
                 s.RemoveAll<IServerStore>();
@@ -58,7 +60,7 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
 }
 
 /// <summary>The HTTP API end to end on the in-memory store; <see cref="PostgresServerTests"/> runs every test again on PostgreSQL.</summary>
-public class ServerTests : IDisposable
+public partial class ServerTests : IDisposable
 {
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
     private readonly ServerFactory _factory;
