@@ -482,3 +482,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Android plugin build output (built in CI)
+android/google-sign-in/build/
+android/google-sign-in/.gradle/
