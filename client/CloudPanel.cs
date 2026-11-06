@@ -74,7 +74,7 @@ public partial class CloudPanel : VBoxContainer
         string revision = cloud.Revision > 0 ? $" (#{cloud.Revision})" : "";
         _status.Text = cloud.State switch
         {
-            CloudState.Synced => "Cloud: " + cloud.Message + revision,
+            CloudState.Synced => "Cloud: " + cloud.Message.TrimEnd('.') + revision,
             CloudState.NotConnected => "Cloud: off. " + cloud.Message,
             _ => "Cloud: " + cloud.Message,
         };
