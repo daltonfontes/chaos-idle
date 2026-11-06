@@ -48,7 +48,7 @@ namespace ChaosIdle.App
             _offline = new OfflineCalculator(loot);
         }
 
-        public GameState State { get; }
+        public GameState State { get; private set; }
         public PlayerCharacter Character => State.Character;
 
         /// <summary>Messages to show once after loading (content changes, recovered backups).</summary>

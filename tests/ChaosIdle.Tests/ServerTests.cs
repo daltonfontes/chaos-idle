@@ -70,7 +70,11 @@ public partial class ServerTests : IDisposable
     protected ServerTests(ServerFactory factory) => _factory = factory;
     private readonly SaveSerializer _serializer = new();
 
-    public void Dispose() => _factory.Dispose();
+    public void Dispose()
+    {
+        _factory.Dispose();
+        DeleteDeviceDirs();
+    }
 
     private async Task<HttpClient> SignedIn()
     {

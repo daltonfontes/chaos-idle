@@ -36,7 +36,9 @@ automatic combat, and bounded offline expeditions.
     memory for quick runs. See [`docs/backend.md`](docs/backend.md).
   - Done: sign-in on the server. Guests can link Google or Apple (OpenID Connect ID tokens
     checked by the server), sign in on other devices, and sign out one device or all of them.
-  - Next: sign-in and cloud sync in the client, rate limiting and HTTPS, database backups,
+  - Done: cloud save in the client. The phone syncs with the server, never overwrites when
+    both sides changed (the player picks), and offline progress runs on the server.
+  - Next: the account screen with Google sign-in in the client, rate limiting and HTTPS, database backups,
     crash reporting in the client.
 
 ## Layout

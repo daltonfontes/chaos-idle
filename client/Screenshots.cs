@@ -24,6 +24,14 @@ public partial class Screenshots : Node
             await Frames(5);
 
             main.PlayFirstUnlocked();
+            if (System.Environment.GetEnvironmentVariable("CHAOSIDLE_SERVER_URL") != null)
+            {
+                await main.ConnectCloud(); // real HTTP from the Godot runtime to the game server
+                if (main.Cloud?.State != ChaosIdle.App.CloudState.Synced)
+                    throw new InvalidOperationException($"Cloud sync failed: {main.Cloud?.State} {main.Cloud?.Message}");
+                GD.Print($"CLOUD SYNCED: revision {main.Cloud.Revision}");
+            }
+
             main.ShowTab(0);
             main.FreezeFight(boss: false, secondsIn: 3);
             await Capture(dir, "1-adventure.png");

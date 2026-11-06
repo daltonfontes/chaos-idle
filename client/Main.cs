@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using ChaosIdle.App;
 using Godot;
 
@@ -27,6 +29,8 @@ public partial class Main : Control
     private MapsTab _mapsTab = null!;
     private LootTab _lootTab = null!;
     private FightPanel _fight = null!;
+    private CloudPanel _cloud = null!;
+    private Godot.Timer _syncSoon = null!;
     private ScrollContainer _heroScroll = null!;
 
     public override void _Ready()
@@ -41,12 +45,12 @@ public partial class Main : Control
         if (_session == null) return;
         if (what == NotificationApplicationPaused || what == NotificationWMCloseRequest)
         {
-            _session.OnPause(DateTime.UtcNow);
+            // The local session starts at once; moving it to the server gets a few seconds at most.
+            _ = _session.OnPauseAsync(DateTime.UtcNow, new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token);
         }
         else if (what == NotificationApplicationResumed)
         {
-            Show(_session.OnResume(DateTime.UtcNow));
-            Refresh();
+            _ = ResumeAsync();
         }
     }
 
@@ -57,8 +61,9 @@ public partial class Main : Control
         {
             _session = GameSession.LoadOrCreate(dir, DateTime.UtcNow);
             Show(_session.LoadNotices);
-            Show(_session.OnResume(DateTime.UtcNow)); // returning after the app was closed
+            SetUpCloud(_session);
             Refresh();
+            _ = ResumeAsync(); // returning after the app was closed
         }
         catch (Exception e)
         {
@@ -99,8 +104,8 @@ public partial class Main : Control
             _tabs.CurrentTab = 0; // watch the fight and read the report on the Hero tab
             PlayLastFight();
         });
-        _passives = new PassivesTab(() => _session, Refresh) { Name = "Tree" };
-        _skillsTab = new SkillsTab(() => _session, Refresh);
+        _passives = new PassivesTab(() => _session, () => Refresh()) { Name = "Tree" };
+        _skillsTab = new SkillsTab(() => _session, () => Refresh());
         _lootTab = new LootTab(() => _session);
         tabs.AddChild(Scrolling(_mapsTab));
         tabs.AddChild(_passives); // not in a ScrollContainer: dragging pans the tree instead of scrolling
@@ -109,6 +114,11 @@ public partial class Main : Control
         tabs.TabChanged += _ => { _mapsTab.Refresh(); _passives.Refresh(); _skillsTab.Refresh(); _lootTab.Refresh(); };
 
         column.AddChild(new Label { Text = "Chaos Idle", HorizontalAlignment = HorizontalAlignment.Center });
+        _cloud = new CloudPanel(() => _session, RefreshScreens);
+        column.AddChild(_cloud);
+        _syncSoon = new Godot.Timer { WaitTime = 3, OneShot = true };
+        _syncSoon.Timeout += () => _ = _cloud.SyncNow();
+        AddChild(_syncSoon);
         _fight = new FightPanel();
         column.AddChild(_fight);
         _sheet = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
@@ -179,11 +189,49 @@ public partial class Main : Control
 
     public void PreviewPassive(string id) => _passives.Preview(id);
 
+    /// <summary>Creates a cloud account for this phone and syncs (screenshots; players use the button).</summary>
+    public Task ConnectCloud() => _cloud.ConnectNow();
+
+    public CloudStatus? Cloud => _session?.Cloud;
+
     public void ChooseMap(string mapId, params string[] modifierIds) => _mapsTab.Choose(mapId, modifierIds);
 
     public void SetLootFilter(ChaosIdle.App.FilterPreset preset, ChaosIdle.Domain.Items.ItemRarity minimum) => _lootTab.Set(preset, minimum);
 
     public void PreviewSupport(string skillId, string supportId) => _skillsTab.Preview(skillId, supportId);
+
+    /// <summary>
+    /// The server address comes from CHAOSIDLE_SERVER_URL (desktop, CI) or the project setting
+    /// chaos_idle/cloud/server_url (set it before exporting the APK). Empty: no cloud in this build.
+    /// </summary>
+    private void SetUpCloud(GameSession session)
+    {
+        string url = System.Environment.GetEnvironmentVariable("CHAOSIDLE_SERVER_URL")
+                     ?? ProjectSettings.GetSetting("chaos_idle/cloud/server_url", "").AsString();
+        _cloud.Enabled = !string.IsNullOrWhiteSpace(url);
+        if (_cloud.Enabled)
+            session.UseCloud(new System.Net.Http.HttpClient { BaseAddress = new Uri(url.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(10) });
+        _cloud.Refresh();
+    }
+
+    private async Task ResumeAsync()
+    {
+        if (_session == null) return;
+        var lines = await _session.OnResumeAsync(DateTime.UtcNow, new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token);
+        Show(lines);
+        RefreshScreens();
+    }
+
+    /// <summary>After a sync may have replaced the game: redraw everything without starting another sync.</summary>
+    private void RefreshScreens()
+    {
+        Refresh(sync: false);
+        _cloud.Refresh();
+        _mapsTab.Refresh();
+        _passives.Refresh();
+        _skillsTab.Refresh();
+        _lootTab.Refresh();
+    }
 
     private void PlayLastFight()
     {
@@ -200,9 +248,11 @@ public partial class Main : Control
         return scroll;
     }
 
-    private void Refresh()
+    /// <param name="sync">After a player action: upload it a few seconds later (batched).</param>
+    private void Refresh(bool sync = true)
     {
         if (_session == null) return;
+        if (sync && _session.HasCloudAccount) _syncSoon.Start();
         _sheet.Text = string.Join("\n", _session.CharacterSheet());
 
         foreach (var child in _maps.GetChildren()) child.QueueFree();

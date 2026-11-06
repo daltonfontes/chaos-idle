@@ -84,6 +84,12 @@ namespace ChaosIdle.Persistence
             }
         }
 
+        /// <summary>
+        /// The checksum of the save's content alone (no revision or time): equal for two saves
+        /// that describe the same game. Cloud sync uses it to tell whether anything changed.
+        /// </summary>
+        public static string PayloadChecksum(SaveData data) => Checksum(JsonSerializer.Serialize(data, Options));
+
         public string Serialize(SaveData data, long revision, DateTime savedAtUtc)
         {
             string payload = JsonSerializer.Serialize(data, Options);
