@@ -21,7 +21,10 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 9.0.x   # Godot 4.7's Android export templates require .NET 9
+          dotnet-version: |
+            9.0.x
+            8.0.x
+          # 9: Godot 4.7's Android export templates require it. 8: the game server, for the cloud screenshots.
 
       - uses: actions/setup-java@v4
         with:
@@ -74,14 +77,23 @@ jobs:
           "$GODOT" --headless --path client res://Smoke.tscn 2>&1 | tee smoke.log
           grep -q "SMOKE OK" smoke.log
 
+      - name: Start the game server (in memory) for cloud sync
+        run: |
+          dotnet run --project src/ChaosIdle.Server --configuration Release --no-launch-profile --urls http://127.0.0.1:5080 > server.log 2>&1 &
+          for i in $(seq 1 120); do curl -sf http://127.0.0.1:5080/health && break; sleep 1; done
+          curl -sf http://127.0.0.1:5080/health
+
       - name: Screenshots (real renderer on a virtual display)
         run: |
           sudo apt-get install -y -qq xvfb libgl1-mesa-dri > /dev/null
           export SCREENSHOT_DIR="$PWD/screenshots"
+          export CHAOSIDLE_SERVER_URL=http://127.0.0.1:5080   # the game syncs its save with the real server
           xvfb-run -a -s "-screen 0 720x1280x24" "$GODOT" --path client --rendering-driver opengl3 \
             --rendering-method gl_compatibility --resolution 720x1280 res://Screenshots.tscn 2>&1 | tee shots.log
           grep -q "SCREENSHOTS OK" shots.log
+          grep -q "CLOUD SYNCED" shots.log
           ls -l screenshots
+          pkill -f ChaosIdle.Server || true
 
       - uses: actions/upload-artifact@v4
         with:

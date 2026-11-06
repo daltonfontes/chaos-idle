@@ -42,9 +42,12 @@ namespace ChaosIdle.Persistence
         private string TempPath => _path + ".tmp";
 
         /// <summary>Saves the state, incrementing its revision.</summary>
-        public void Save(GameState state, DateTime nowUtc)
+        public void Save(GameState state, DateTime nowUtc) => SaveAs(state, state.Revision + 1, nowUtc);
+
+        /// <summary>Saves the state under a given revision (cloud sync keeps local and cloud revisions equal).</summary>
+        public void SaveAs(GameState state, long revision, DateTime nowUtc)
         {
-            state.Revision++;
+            state.Revision = revision;
             string text = _serializer.Serialize(SaveMapper.ToSave(state), state.Revision, nowUtc);
 
             using (var stream = new FileStream(TempPath, FileMode.Create, FileAccess.Write, FileShare.None))

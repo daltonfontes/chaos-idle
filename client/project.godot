@@ -11,6 +11,12 @@ run/main_scene="res://Main.tscn"
 config/features=PackedStringArray("4.7", "C#", "Mobile")
 config/icon="res://icon.svg"
 
+[chaos_idle]
+
+; The game server for cloud saves, e.g. "https://api.example.com". Empty: no cloud in this build.
+; CHAOSIDLE_SERVER_URL overrides it on desktop and in CI.
+cloud/server_url=""
+
 [display]
 
 window/size/viewport_width=720
