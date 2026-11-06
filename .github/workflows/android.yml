@@ -16,6 +16,7 @@ env:
 jobs:
   client:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -152,6 +153,7 @@ jobs:
           for i in 1 2 3; do git -C "$work" push --quiet origin ci-screenshots && break; sleep 5; git -C "$work" pull --quiet --rebase origin ci-screenshots || true; done
 
       - name: Export debug APK
+        timeout-minutes: 25
         env:
           SERVER_URL: ${{ vars.CHAOSIDLE_SERVER_URL }}
           GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
@@ -167,10 +169,10 @@ jobs:
             sed -i "s|^auth/google_web_client_id=.*|auth/google_web_client_id=\"${GOOGLE_CLIENT_ID}\"|" client/project.godot
           fi
           grep -E "^(cloud/server_url|auth/google_web_client_id)=" client/project.godot
-          # Android plugins need a Gradle build: install Godot's Android build template first.
-          "$GODOT" --headless --path client --install-android-build-template 2>&1 | tee template.log
+          # Android plugins need a Gradle build. --install-android-build-template only works together
+          # with an export (on its own it leaves the editor running): it installs the template, then exports.
+          "$GODOT" --headless --path client --install-android-build-template --export-debug "Android" build/chaos-idle-debug.apk 2>&1 | tee export.log
           test -f client/android/build/build.gradle || { echo "::error::The Android build template was not installed."; exit 1; }
-          "$GODOT" --headless --path client --export-debug "Android" build/chaos-idle-debug.apk 2>&1 | tee export.log
           ls -l client/build
           # Godot can finish an export "with warnings" while leaving the C# code out of the APK.
           # Fail on any export error, and prove the game assembly is inside the package.
