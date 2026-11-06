@@ -39,12 +39,18 @@ CHAOSIDLE_TEST_POSTGRES="Host=localhost;Username=chaosidle;Password=chaosidle;Da
 
 ## API
 
-Every `/v1` route except `POST /v1/accounts` needs `Authorization: Bearer <token>`.
+Every `/v1` route except `POST /v1/accounts` and `POST /v1/auth/{provider}` needs
+`Authorization: Bearer <token>`.
 
 | Method and path | Purpose | Responses |
 |---|---|---|
 | `GET /health` | liveness | 200 |
-| `POST /v1/accounts` | create an account; returns `{accountId, token}` **once** (only a SHA-256 hash is stored) | 201 |
+| `POST /v1/accounts` | create a **guest** account; returns `{accountId, token}` **once** (only a SHA-256 hash is stored) | 201 |
+| `POST /v1/auth/{provider}` | `{idToken}` from Google or Apple: sign in to the linked account, or create one; returns `{accountId, token, created, signIns}` with a **new device token** | 200, 201 (new account), 401, 404 (provider off), 503 |
+| `GET /v1/account` | `{accountId, createdAt, isGuest, signIns:[{provider, email, linkedAt}]}` | 200 |
+| `POST /v1/account/link/{provider}` | `{idToken}`: link Google or Apple to this account (usually a guest), keeping its progress | 200, 401, 404, 409, 503 |
+| `POST /v1/account/sign-out` | revoke this device's token | 200, 409 (guest) |
+| `POST /v1/account/sign-out-everywhere` | revoke every token of the account | 200 `{tokensRevoked}`, 409 (guest) |
 | `GET /v1/saves/{slot}` | download the cloud save; `ETag` is the revision | 200, 404 |
 | `PUT /v1/saves/{slot}` | upload a save; header `X-Base-Revision` is the server revision this device last synced (0 for none) | 200 `{revision}`, 400, 409, 413, 422 |
 | `POST /v1/saves/{slot}/offline` | `{mapId, modifierIds}`: start an offline session from the **cloud** copy of the character | 201 `{sessionId, startedAtUtc, revision}`, 400, 403, 404, 409 |
@@ -53,6 +59,57 @@ Every `/v1` route except `POST /v1/accounts` needs `Authorization: Bearer <token
 
 Slots match `^[a-z0-9][a-z0-9_-]{0,31}$`. Errors are JSON with `title`, `status` and, where
 useful, `details`.
+
+### Sign-in
+
+Players start as **guests**: `POST /v1/accounts` gives a device token, and nothing else
+identifies them. Losing the device loses the account. Linking a platform sign-in fixes that.
+
+- **How.** The app signs in with the platform's own SDK and gets an OpenID Connect **ID
+  token**: Google through Credential Manager on Android, Apple through Sign in with Apple on
+  iOS. It sends that token to the server, which checks it in `OidcIdentityVerifier`:
+  - the signature, against the provider's public keys (fetched from its discovery document and
+    cached);
+  - the issuer;
+  - the audience (our client ids);
+  - expiry and not-before, on server time.
+
+  The account is keyed by the provider's stable `sub`. The email is kept only when the
+  provider says it is verified.
+- **Flows.**
+  - A guest links Google (`/v1/account/link/google`) and keeps the same account and saves.
+  - On a new phone, `/v1/auth/google` returns the same account and a **new token for that
+    device**. Each device has its own token (`device_tokens`), so one can be signed out
+    without the others.
+  - If the Google identity already belongs to another game account, linking answers 409
+    `identity_in_use`. The app can then offer "switch to that account", which signs in with
+    `/v1/auth/google`; this device's guest progress stays behind.
+  - One identity per provider per account (409 `provider_already_linked`).
+- **Sign-out** is refused for guests (409 `guest_account`): with no sign-in linked, it would
+  lose the account for good.
+- **Configuration.** A provider is off until a client id is set. Use the **Web** client id
+  from Google Cloud: the Android app requests ID tokens for it. For Apple, use the app's
+  bundle id (or Services ID). Several ids can be listed.
+
+  ```bash
+  Auth__Google__ClientIds__0=1234-abc.apps.googleusercontent.com
+  ```
+
+  ```bash
+  Auth__Apple__ClientIds__0=com.example.chaosidle
+  ```
+
+  If the provider's keys can't be fetched, sign-in answers 503 rather than rejecting the
+  player.
+- **Tests** sign real RS256 tokens with a key made in the test (`TestIdentityProvider`) and run
+  them through the real verifier. They cover:
+  - wrong audience, wrong issuer, expired, not yet valid, and forged signature;
+  - an unverified email;
+  - linking conflicts;
+  - signing out one device or every device;
+  - eight simultaneous first sign-ins ending on one account.
+
+  All of these also run on PostgreSQL.
 
 ### Saves
 
@@ -126,8 +183,13 @@ recorded in `schema_migrations`. A PostgreSQL advisory lock stops two instances 
 once from applying a migration twice. To change the schema, add a new file; never edit one
 that has shipped.
 
-**Schema** (`0001_initial.sql`):
-- `accounts`: `id`, `token_hash` (unique), `created_at`.
+**Schema** (`0001_initial.sql`, `0002_sign_in.sql`):
+- `accounts`: `id`, `created_at`.
+- `device_tokens`: `token_hash` (primary key), `account_id`, `created_at`, `revoked_at`.
+  Migration 0002 moved the old per-account token here, so existing devices stay signed in.
+- `linked_identities`: primary key `(provider, subject)`, plus `account_id`, `email` and
+  `linked_at`. A unique `(account_id, provider)` allows one Google and one Apple identity per
+  account.
 - `cloud_saves`: primary key `(account_id, slot)`, `revision`, `body`, `updated_at`. `body` is
   **text**, not `jsonb`, so the save envelope keeps its exact bytes and its checksum still
   matches.
@@ -143,8 +205,11 @@ that has shipped.
 
 ## Not done yet (before an external beta)
 
-- **Real sign-in.** Google Play Games / Apple Game Center, or email, linked to the account.
-  Device tokens are a placeholder and are lost with the device.
+- **Sign-in in the client.** The server side is done. The Godot app still needs:
+  - an Android plugin for Google Credential Manager (and Sign in with Apple for iOS);
+  - a Google Cloud project with OAuth client ids;
+  - the account screen: link, switch account, sign out;
+  - cloud sync of the save.
 - **HTTPS, rate limiting** (`AddRateLimiter` per account and per IP), and request logging
   without tokens.
 - **Backups** of the PostgreSQL database (managed service snapshots or `pg_dump`), and a

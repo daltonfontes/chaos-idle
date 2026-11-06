@@ -34,8 +34,10 @@ automatic combat, and bounded offline expeditions.
     on the server with server time and idempotent claims, and telemetry intake. It stores
     data in PostgreSQL (with migrations; every API test also runs on PostgreSQL in CI), or in
     memory for quick runs. See [`docs/backend.md`](docs/backend.md).
-  - Next: real sign-in, rate limiting and HTTPS, database backups, crash reporting in the
-    client.
+  - Done: sign-in on the server. Guests can link Google or Apple (OpenID Connect ID tokens
+    checked by the server), sign in on other devices, and sign out one device or all of them.
+  - Next: sign-in and cloud sync in the client, rate limiting and HTTPS, database backups,
+    crash reporting in the client.
 
 ## Layout
 

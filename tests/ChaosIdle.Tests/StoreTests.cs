@@ -21,17 +21,47 @@ public abstract class StoreContractTests : IDisposable
 
     protected Account NewAccount(string id = "acc_1")
     {
-        var a = new Account(id, "hash_" + id, T0);
+        var a = new Account(id, T0);
         Store.AddAccount(a);
+        Store.AddToken(new DeviceToken("hash_" + id, id, T0));
         return a;
     }
 
     [SkippableFact]
-    public void Accounts_are_found_by_token_hash_only()
+    public void Accounts_are_found_by_live_token_hash_only()
     {
         var a = NewAccount();
-        Assert.Equal(a, Store.FindAccountByTokenHash(a.TokenHash));
+        Store.AddToken(new DeviceToken("hash_phone", a.Id, T0));
+        Assert.Equal(a, Store.FindAccountByTokenHash("hash_acc_1"));
+        Assert.Equal(a, Store.FindAccountByTokenHash("hash_phone"));
+        Assert.Equal(a, Store.FindAccount(a.Id));
         Assert.Null(Store.FindAccountByTokenHash("nope"));
+
+        Store.RevokeToken("hash_phone", T0.AddHours(1));
+        Assert.Null(Store.FindAccountByTokenHash("hash_phone"));
+        Assert.Equal(a, Store.FindAccountByTokenHash("hash_acc_1"));
+
+        Store.AddToken(new DeviceToken("hash_tablet", a.Id, T0));
+        Assert.Equal(2, Store.RevokeAllTokens(a.Id, T0.AddHours(2))); // the already revoked one is not counted
+        Assert.Null(Store.FindAccountByTokenHash("hash_acc_1"));
+        Assert.Null(Store.FindAccountByTokenHash("hash_tablet"));
+    }
+
+    [SkippableFact]
+    public void Identities_link_once_and_one_per_provider()
+    {
+        var a = NewAccount("acc_a");
+        var b = NewAccount("acc_b");
+        var g = new LinkedIdentity("google", "sub-1", a.Id, "a@example.com", T0);
+        Assert.True(Store.TryLinkIdentity(g));
+        Assert.Equal(g, Store.FindIdentity("google", "sub-1"));
+        Assert.Null(Store.FindIdentity("apple", "sub-1"));
+
+        Assert.False(Store.TryLinkIdentity(g with { AccountId = b.Id }));          // identity taken
+        Assert.False(Store.TryLinkIdentity(g with { Subject = "sub-2" }));         // a already has Google
+        Assert.True(Store.TryLinkIdentity(new LinkedIdentity("apple", "sub-1", a.Id, null, T0)));
+        Assert.Equal(new[] { "apple", "google" }, Store.IdentitiesOf(a.Id).Select(i => i.Provider));
+        Assert.Empty(Store.IdentitiesOf(b.Id));
     }
 
     [SkippableFact]
@@ -141,6 +171,21 @@ public class PostgresStoreTests : StoreContractTests
         var e = Assert.Throws<PostgresException>(() =>
             Store.AddSession(new OfflineSessionRecord("off_2", a.Id, "main", "{}", T0, null, null, null)));
         Assert.Equal(PostgresErrorCodes.UniqueViolation, e.SqlState);
+    }
+
+    [SkippableFact]
+    public void Upgrading_keeps_existing_device_tokens()
+    {
+        // A database from before sign-in: schema 0001 with one account and its token hash on the row.
+        using var db = new PostgresTestDatabase();
+        using var source = NpgsqlDataSource.Create(db.ConnectionString);
+        PostgresMigrations.Apply(source, upTo: 1);
+        using (var cmd = source.CreateCommand("insert into accounts (id, token_hash, created_at) values ('acc_old', 'hash_old', now())"))
+            cmd.ExecuteNonQuery();
+
+        using var store = PostgresServerStore.Open(db.ConnectionString); // applies 0002
+        Assert.Equal("acc_old", store.FindAccountByTokenHash("hash_old")!.Id);
+        Assert.Empty(store.IdentitiesOf("acc_old"));
     }
 
     [SkippableFact]

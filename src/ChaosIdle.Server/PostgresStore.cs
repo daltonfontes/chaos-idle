@@ -31,12 +31,44 @@ public sealed class PostgresServerStore : IServerStore, IDisposable
     // ---- Accounts ----
 
     public void AddAccount(Account account) =>
-        Execute("insert into accounts (id, token_hash, created_at) values ($1, $2, $3)",
-            account.Id, account.TokenHash, account.CreatedAt);
+        Execute("insert into accounts (id, created_at) values ($1, $2)", account.Id, account.CreatedAt);
+
+    public Account? FindAccount(string accountId) =>
+        QuerySingle("select id, created_at from accounts where id = $1",
+            r => new Account(r.GetString(0), r.GetFieldValue<DateTimeOffset>(1)), accountId);
+
+    public void AddToken(DeviceToken token) =>
+        Execute("insert into device_tokens (token_hash, account_id, created_at, revoked_at) values ($1, $2, $3, $4)",
+            token.Hash, token.AccountId, token.CreatedAt, token.RevokedAt);
 
     public Account? FindAccountByTokenHash(string tokenHash) =>
-        QuerySingle("select id, token_hash, created_at from accounts where token_hash = $1",
-            r => new Account(r.GetString(0), r.GetString(1), r.GetFieldValue<DateTimeOffset>(2)), tokenHash);
+        QuerySingle("select a.id, a.created_at from device_tokens t join accounts a on a.id = t.account_id " +
+                    "where t.token_hash = $1 and t.revoked_at is null",
+            r => new Account(r.GetString(0), r.GetFieldValue<DateTimeOffset>(1)), tokenHash);
+
+    public void RevokeToken(string tokenHash, DateTimeOffset at) =>
+        Execute("update device_tokens set revoked_at = $2 where token_hash = $1 and revoked_at is null", tokenHash, at);
+
+    public int RevokeAllTokens(string accountId, DateTimeOffset at) =>
+        Execute("update device_tokens set revoked_at = $2 where account_id = $1 and revoked_at is null", accountId, at);
+
+    // ---- Linked identities ----
+
+    private const string IdentityColumns = "provider, subject, account_id, email, linked_at";
+
+    public LinkedIdentity? FindIdentity(string provider, string subject) =>
+        QuerySingle($"select {IdentityColumns} from linked_identities where provider = $1 and subject = $2", ReadIdentity, provider, subject);
+
+    public IReadOnlyList<LinkedIdentity> IdentitiesOf(string accountId) =>
+        Query($"select {IdentityColumns} from linked_identities where account_id = $1 order by provider", ReadIdentity, accountId);
+
+    /// <remarks>"on conflict do nothing" covers both unique rules (identity, and one per provider per account).</remarks>
+    public bool TryLinkIdentity(LinkedIdentity i) =>
+        Execute($"insert into linked_identities ({IdentityColumns}) values ($1, $2, $3, $4, $5) on conflict do nothing",
+            i.Provider, i.Subject, i.AccountId, i.Email, i.LinkedAt) == 1;
+
+    private static LinkedIdentity ReadIdentity(NpgsqlDataReader r) => new(
+        r.GetString(0), r.GetString(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetString(3), r.GetFieldValue<DateTimeOffset>(4));
 
     // ---- Saves ----
 
@@ -156,7 +188,7 @@ public sealed class PostgresServerStore : IServerStore, IDisposable
         return result;
     }
 
-    private void Execute(string sql, params object?[] args) => Run(tx =>
+    private int Execute(string sql, params object?[] args) => Run(tx =>
     {
         using var cmd = Command(sql, tx, args);
         return cmd.ExecuteNonQuery();
@@ -220,8 +252,9 @@ public static class PostgresMigrations
             .ToList();
     }
 
+    /// <param name="upTo">Apply only migrations up to this version (tests of upgrades); null for all.</param>
     /// <returns>The versions applied by this call.</returns>
-    public static IReadOnlyList<int> Apply(NpgsqlDataSource source)
+    public static IReadOnlyList<int> Apply(NpgsqlDataSource source, int? upTo = null)
     {
         using var connection = source.OpenConnection();
         Exec(connection, null, $"select pg_advisory_lock({LockKey})");
@@ -236,7 +269,7 @@ public static class PostgresMigrations
             var applied = new List<int>();
             foreach (var (version, name, sql) in All())
             {
-                if (done.Contains(version)) continue;
+                if (done.Contains(version) || version > upTo) continue;
                 using var tx = connection.BeginTransaction();
                 Exec(connection, tx, sql);
                 using (var record = new NpgsqlCommand("insert into schema_migrations (version, name) values ($1, $2)", connection, tx))

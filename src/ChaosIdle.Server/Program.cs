@@ -20,6 +20,8 @@ builder.Services.AddSingleton(new SaveSerializer());
 builder.Services.AddSingleton(SaveRules.Default);
 builder.Services.AddSingleton(new OfflineCalculator(new LootGenerator(ItemBases.All, Affixes.All, uniques: Uniques.All)));
 builder.Services.AddSingleton<GameService>();
+builder.Services.AddSingleton<IIdentityVerifier>(sp => OidcIdentityVerifier.FromConfiguration(builder.Configuration, sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton<AccountService>();
 builder.Services.AddProblemDetails();
 
 var app = builder.Build();
@@ -54,15 +56,34 @@ namespace ChaosIdle.Server
         {
             app.MapGet("/health", (IServerStore store) => Results.Ok(new { status = "ok", store = store is PostgresServerStore ? "postgres" : "memory" }));
 
-            app.MapPost("/v1/accounts", (IServerStore store, TimeProvider time) =>
+            // A guest account: a device token only, until Google or Apple is linked.
+            app.MapPost("/v1/accounts", (AccountService accounts) =>
             {
-                string token = Auth.NewToken();
-                var account = new Account("acc_" + Guid.NewGuid().ToString("N"), Auth.Hash(token), time.GetUtcNow());
-                store.AddAccount(account);
-                return Results.Created($"/v1/accounts/{account.Id}", new CreateAccountResponse(account.Id, token));
+                var guest = accounts.CreateGuest();
+                return Results.Created($"/v1/accounts/{guest.AccountId}", new CreateAccountResponse(guest.AccountId, guest.Token));
+            });
+
+            // Sign in with a platform ID token: returns the linked account (or a new one) and a new device token.
+            app.MapPost("/v1/auth/{provider}", async (string provider, SignInRequest request, AccountService accounts, CancellationToken cancel) =>
+            {
+                var result = await accounts.SignInAsync(provider, request.IdToken, cancel);
+                return result.Outcome == Outcome.Ok && result.Value!.Created
+                    ? Results.Created($"/v1/accounts/{result.Value.AccountId}", result.Value)
+                    : ToHttp(result);
             });
 
             var v1 = app.MapGroup("/v1").AddEndpointFilter(Auth.RequireAccount);
+
+            v1.MapGet("/account", (HttpContext http, AccountService accounts) => Results.Ok(accounts.View(http.Account())));
+
+            v1.MapPost("/account/link/{provider}", async (string provider, SignInRequest request, HttpContext http, AccountService accounts, CancellationToken cancel) =>
+                ToHttp(await accounts.LinkAsync(http.Account(), provider, request.IdToken, cancel)));
+
+            v1.MapPost("/account/sign-out", (HttpContext http, AccountService accounts) =>
+                ToHttp(accounts.SignOut(http.Account(), http.TokenHash(), everywhere: false)));
+
+            v1.MapPost("/account/sign-out-everywhere", (HttpContext http, AccountService accounts) =>
+                ToHttp(accounts.SignOut(http.Account(), http.TokenHash(), everywhere: true)));
 
             v1.MapGet("/saves/{slot}", (string slot, HttpContext http, IServerStore store) =>
             {
@@ -120,6 +141,8 @@ namespace ChaosIdle.Server
         {
             Outcome.Ok => Results.Ok(r.Value),
             Outcome.NotFound => Results.Problem(r.Error, statusCode: 404),
+            Outcome.Unauthorized => Results.Problem(r.Error, statusCode: 401),
+            Outcome.Unavailable => Results.Problem(r.Error, statusCode: 503),
             Outcome.Forbidden => Results.Problem(r.Error, statusCode: 403),
             Outcome.Conflict => Results.Json(new { title = r.Error, status = 409, details = r.Details, current = r.Value }, statusCode: 409),
             Outcome.Invalid => Results.Json(new { title = r.Error, status = 422, details = r.Details }, statusCode: 422),
