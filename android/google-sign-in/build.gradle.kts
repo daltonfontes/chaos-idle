@@ -1,13 +1,16 @@
 // A Godot 4 Android plugin (v2): Google sign-in through Android's Credential Manager.
 // Built in CI into an AAR that the export plugin in client/addons/chaos_google_sign_in adds to the APK.
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+// Kotlin 2.1: the Godot 4.7 library is compiled with it.
 plugins {
-    id("com.android.library") version "8.5.2"
-    id("org.jetbrains.kotlin.android") version "1.9.24"
+    id("com.android.library") version "8.7.3"
+    id("org.jetbrains.kotlin.android") version "2.1.0"
 }
 
 android {
     namespace = "com.chaosidle.googlesignin"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         minSdk = 24
@@ -17,9 +20,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
 
-    kotlinOptions {
-        jvmTarget = "17"
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
