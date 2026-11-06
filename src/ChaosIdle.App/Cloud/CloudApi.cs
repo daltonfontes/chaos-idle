@@ -83,6 +83,31 @@ namespace ChaosIdle.App.Cloud
         public List<string> Report { get; set; } = new List<string>();
     }
 
+    public sealed class SignedInDto
+    {
+        public string AccountId { get; set; } = "";
+        public string Token { get; set; } = "";
+        public bool Created { get; set; }
+    }
+
+    public sealed class IdentityDto
+    {
+        public string Provider { get; set; } = "";
+        public string? Email { get; set; }
+    }
+
+    public sealed class AccountDto
+    {
+        public string AccountId { get; set; } = "";
+        public bool IsGuest { get; set; }
+        public List<IdentityDto> SignIns { get; set; } = new List<IdentityDto>();
+    }
+
+    public sealed class SignedOutDto
+    {
+        public int TokensRevoked { get; set; }
+    }
+
     /// <summary>
     /// The game server's HTTP API (docs/backend.md), for the client. Expected failures come back
     /// as a <see cref="CallStatus"/>, never as exceptions, so a dropped connection can't crash the game.
@@ -100,6 +125,22 @@ namespace ChaosIdle.App.Cloud
 
         public Task<CallResult<GuestAccount>> CreateGuestAsync(CancellationToken cancel = default) =>
             SendAsync(() => new HttpRequestMessage(HttpMethod.Post, "v1/accounts"), ReadJson<GuestAccount>, cancel, authorized: false);
+
+        /// <summary>Signs in with a platform ID token (no device token needed): the linked account, or a new one.</summary>
+        public Task<CallResult<SignedInDto>> SignInAsync(string provider, string idToken, CancellationToken cancel = default) =>
+            SendAsync(() => new HttpRequestMessage(HttpMethod.Post, $"v1/auth/{provider}") { Content = JsonBody(new { idToken }) },
+                ReadJson<SignedInDto>, cancel, authorized: false);
+
+        public Task<CallResult<AccountDto>> GetAccountAsync(CancellationToken cancel = default) =>
+            SendAsync(() => new HttpRequestMessage(HttpMethod.Get, "v1/account"), ReadJson<AccountDto>, cancel);
+
+        public Task<CallResult<AccountDto>> LinkAsync(string provider, string idToken, CancellationToken cancel = default) =>
+            SendAsync(() => new HttpRequestMessage(HttpMethod.Post, $"v1/account/link/{provider}") { Content = JsonBody(new { idToken }) },
+                ReadJson<AccountDto>, cancel);
+
+        public Task<CallResult<SignedOutDto>> SignOutAsync(bool everywhere, CancellationToken cancel = default) =>
+            SendAsync(() => new HttpRequestMessage(HttpMethod.Post, everywhere ? "v1/account/sign-out-everywhere" : "v1/account/sign-out"),
+                ReadJson<SignedOutDto>, cancel);
 
         public Task<CallResult<CloudSaveText>> GetSaveAsync(string slot, CancellationToken cancel = default) =>
             SendAsync(() => new HttpRequestMessage(HttpMethod.Get, $"v1/saves/{slot}"), async res =>

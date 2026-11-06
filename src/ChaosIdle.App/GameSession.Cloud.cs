@@ -332,9 +332,7 @@ namespace ChaosIdle.App
             if (status == CallStatus.SignedOut)
             {
                 // The token no longer works (signed out elsewhere). Forget it; "Connect" starts again.
-                _link = null;
-                _api!.Token = null;
-                if (File.Exists(LinkPath)) File.Delete(LinkPath);
+                ForgetLink();
                 return Status(CloudState.SignedOut, "This device was signed out of the cloud. Your save is still here.");
             }
 
