@@ -160,6 +160,23 @@ Milestone 4 local checks remain for playing without a connection.
 - Events are kept in the store. A real sink (a database table or a log pipeline) comes with
   deployment.
 
+## Running online
+
+`docs/deploy.md` covers it:
+- Caddy for HTTPS (automatic certificates) in front of the server;
+- PostgreSQL;
+- daily backups;
+- the Docker image published by CI.
+
+The server itself (`Hosting.cs`):
+- reads the client IP from Caddy's forwarded headers, when `ForwardedHeaders__Enabled=true`
+  and the server is reachable only through the proxy;
+- applies rate limits:
+  - per IP for creating accounts and signing in (`RateLimits__AnonymousPerMinute`, default 20);
+  - per device token for everything else (`RateLimits__AccountPerMinute`, default 120);
+  - answering 429 with `Retry-After`;
+- answers 503 from `/health` when the database doesn't respond.
+
 ## Store and PostgreSQL
 
 `IServerStore` hides storage. It has two implementations: `InMemoryServerStore` and
@@ -205,15 +222,10 @@ that has shipped.
 
 ## Not done yet (before an external beta)
 
-- **Sign-in in the client.** The server side is done. The Godot app still needs:
-  - an Android plugin for Google Credential Manager (and Sign in with Apple for iOS);
-  - a Google Cloud project with OAuth client ids;
-  - the account screen: link, switch account, sign out;
-  - cloud sync of the save.
-- **HTTPS, rate limiting** (`AddRateLimiter` per account and per IP), and request logging
-  without tokens.
-- **Backups** of the PostgreSQL database (managed service snapshots or `pg_dump`), and a
-  retention policy for telemetry.
+- **Google Cloud credentials** for sign-in (`docs/google-sign-in.md`), and Sign in with Apple for
+  an iOS build.
+- **Off-machine copies of the backups** (`docs/deploy.md`), and a retention policy for telemetry.
+- **Monitoring**: uptime checks on `/health`, and alerts on errors.
 - **Crash reporting.** Use a hosted service (Sentry, Firebase Crashlytics) from the Godot
   client; this API doesn't replace it.
 - **Active-play authority.** Boss kills and tier unlocks still come from the client's save,

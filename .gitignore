@@ -486,3 +486,8 @@ $RECYCLE.BIN/
 # Android plugin build output (built in CI)
 android/google-sign-in/build/
 android/google-sign-in/.gradle/
+
+# Server deployment secrets and backups
+deploy/.env
+deploy/backups/
+deploy/headers.txt

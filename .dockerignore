@@ -1,0 +1,9 @@
+**/bin/
+**/obj/
+.git/
+client/
+android/
+tests/
+docs/
+deploy/backups/
+deploy/.env

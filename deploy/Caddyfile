@@ -1,0 +1,19 @@
+# Caddy gets and renews the HTTPS certificate for {$DOMAIN} by itself (Let's Encrypt), redirects
+# http to https, and forwards to the game server on the private network. With DOMAIN=localhost
+# it uses its own local certificate instead (tests).
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+	request_body {
+		max_size 1MB
+	}
+	reverse_proxy server:8080
+}

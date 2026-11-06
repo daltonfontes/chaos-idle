@@ -56,6 +56,9 @@ public interface IServerStore
 
     /// <summary>Runs <paramref name="action"/> with no other writer for this account running.</summary>
     T WithAccountLock<T>(string accountId, Func<T> action);
+
+    /// <summary>Throws if the storage can't be reached (health checks).</summary>
+    void Ping();
 }
 
 public sealed class InMemoryServerStore : IServerStore
@@ -133,6 +136,8 @@ public sealed class InMemoryServerStore : IServerStore
     public void AddTelemetry(IEnumerable<TelemetryEvent> events) { lock (_gate) _telemetry.AddRange(events); }
 
     public IReadOnlyList<TelemetryEvent> Telemetry { get { lock (_gate) return _telemetry.ToList(); } }
+
+    public void Ping() { }
 
     public T WithAccountLock<T>(string accountId, Func<T> action)
     {
