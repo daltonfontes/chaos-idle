@@ -13,6 +13,10 @@ config/icon="res://icon.svg"
 
 [chaos_idle]
 
+; The OAuth **Web** client id from Google Cloud (the server's Auth__Google__ClientIds__0).
+; Empty: the Google button explains that sign-in isn't set up in this build.
+auth/google_web_client_id=""
+
 ; The game server for cloud saves, e.g. "https://api.example.com". Empty: no cloud in this build.
 ; CHAOSIDLE_SERVER_URL overrides it on desktop and in CI.
 cloud/server_url=""
@@ -28,6 +32,10 @@ window/handheld/orientation=1
 [dotnet]
 
 project/assembly_name="ChaosIdle.Client"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/chaos_google_sign_in/plugin.cfg")
 
 [input_devices]
 

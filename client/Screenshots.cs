@@ -59,6 +59,10 @@ public partial class Screenshots : Node
             main.SetLootFilter(ChaosIdle.App.FilterPreset.Strict, ChaosIdle.Domain.Items.ItemRarity.Magic);
             await Capture(dir, "5-loot.png");
 
+            main.ShowTab(5);
+            await Frames(2);
+            await Capture(dir, "7-account.png");
+
             GD.Print("SCREENSHOTS OK: " + dir);
         }
         catch (Exception e)

@@ -20,6 +20,7 @@ Godot because:
 | `client/Screenshots.cs` + `Screenshots.tscn` | CI only: opens the real main screen, plays an expedition, and saves a PNG of each tab. |
 | `client/Smoke.cs` + `Smoke.tscn` | A headless check run by CI **inside the Godot runtime**: new game, an expedition, background the app, relaunch, come back three hours later with offline loot. |
 | `client/CloudPanel.cs` | **Cloud save** row at the top of Hero: the status in words ("Saved in the cloud (#12)", "No connection; will sync when back online"), "Save to cloud" or "Sync now", and after a conflict the two saves side by side with "Keep this phone's save" / "Use the cloud save". The rules are in `GameSession.Cloud.cs`. |
+| `client/AccountTab.cs` + `client/GoogleSignIn.cs` | **Account** tab: who is signed in (none, guest, or Google with email), "Sign in with Google" (links a guest; on a phone without an account, signs in to that Google account's game), the switch offer when that Google account already has a game, and sign out of this phone or every phone (never for a guest). The flows are in `GameSession.Account.cs`. The token comes from the Android plugin in `android/google-sign-in` (Credential Manager), added to Android exports by `client/addons/chaos_google_sign_in`. Setup: `docs/google-sign-in.md`. |
 | `client/export_presets.cfg` | The Android preset: arm64, debug-signed, package `com.chaosidle.game`. |
 
 **App lifecycle:**
@@ -93,4 +94,4 @@ release.
 
 - Editing single loot filter rules (today: presets plus a minimum rarity).
 - Fight replay: sprites and sounds instead of shapes; replays of offline runs.
-- The account screen: link Google (Credential Manager plugin), switch account, sign out.
+- Sign in with Apple for an iOS build.

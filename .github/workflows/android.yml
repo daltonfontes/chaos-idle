@@ -16,6 +16,7 @@ env:
 jobs:
   client:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -48,6 +49,8 @@ jobs:
           mv "$RUNNER_TEMP/templates/templates/"* "$dest/"
 
       - name: Configure Android SDK, Java and debug keystore
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
           minor="${GODOT_VERSION%.*}"
@@ -61,11 +64,35 @@ jobs:
           export/android/java_sdk_path = "$JAVA_HOME"
           SETTINGS
           done
-          keytool -genkeypair -v -keystore "$RUNNER_TEMP/debug.keystore" -storepass android -alias androiddebugkey \
-            -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          # Google sign-in needs the APK's signing key registered in Google Cloud (its SHA-1), so the
+          # key must stay the same between builds: use the ANDROID_DEBUG_KEYSTORE_BASE64 secret when
+          # it is set (password "android", alias "androiddebugkey"); otherwise make a throwaway one.
+          if [ -n "${DEBUG_KEYSTORE_BASE64:-}" ]; then
+            echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/debug.keystore"
+            echo "Signing with the debug keystore from the ANDROID_DEBUG_KEYSTORE_BASE64 secret."
+          else
+            keytool -genkeypair -v -keystore "$RUNNER_TEMP/debug.keystore" -storepass android -alias androiddebugkey \
+              -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            echo "::notice::No ANDROID_DEBUG_KEYSTORE_BASE64 secret: this APK is signed with a new key, so Google sign-in won't work on it."
+          fi
+          echo "Signing key SHA-1 (register it on the Android OAuth client in Google Cloud):"
+          keytool -list -v -keystore "$RUNNER_TEMP/debug.keystore" -storepass android -alias androiddebugkey | grep -E "SHA1:"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PATH=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey" >> "$GITHUB_ENV"
           echo "GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android" >> "$GITHUB_ENV"
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+
+      # The Godot Android plugin for Google sign-in (Kotlin, Credential Manager). The export
+      # addon in client/addons/chaos_google_sign_in adds this AAR and its libraries to the APK.
+      - name: Build the Google sign-in Android plugin
+        run: |
+          gradle -p android/google-sign-in assembleRelease --no-daemon --stacktrace
+          mkdir -p client/addons/chaos_google_sign_in/bin
+          cp android/google-sign-in/build/outputs/aar/google-sign-in-release.aar client/addons/chaos_google_sign_in/bin/
+          unzip -l client/addons/chaos_google_sign_in/bin/google-sign-in-release.aar
 
       - name: Import project and build C#
         run: |
@@ -126,10 +153,26 @@ jobs:
           for i in 1 2 3; do git -C "$work" push --quiet origin ci-screenshots && break; sleep 5; git -C "$work" pull --quiet --rebase origin ci-screenshots || true; done
 
       - name: Export debug APK
+        timeout-minutes: 25
+        env:
+          SERVER_URL: ${{ vars.CHAOSIDLE_SERVER_URL }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_WEB_CLIENT_ID }}
         run: |
           set -o pipefail
           mkdir -p client/build
-          "$GODOT" --headless --path client --export-debug "Android" build/chaos-idle-debug.apk 2>&1 | tee export.log
+          # The server address and Google Web client id go into the APK from the repository's
+          # Actions variables (Settings > Secrets and variables > Actions > Variables), when set.
+          if [ -n "${SERVER_URL}" ]; then
+            sed -i "s|^cloud/server_url=.*|cloud/server_url=\"${SERVER_URL}\"|" client/project.godot
+          fi
+          if [ -n "${GOOGLE_CLIENT_ID}" ]; then
+            sed -i "s|^auth/google_web_client_id=.*|auth/google_web_client_id=\"${GOOGLE_CLIENT_ID}\"|" client/project.godot
+          fi
+          grep -E "^(cloud/server_url|auth/google_web_client_id)=" client/project.godot
+          # Android plugins need a Gradle build. --install-android-build-template only works together
+          # with an export (on its own it leaves the editor running): it installs the template, then exports.
+          "$GODOT" --headless --path client --install-android-build-template --export-debug "Android" build/chaos-idle-debug.apk 2>&1 | tee export.log
+          test -f client/android/build/build.gradle || { echo "::error::The Android build template was not installed."; exit 1; }
           ls -l client/build
           # Godot can finish an export "with warnings" while leaving the C# code out of the APK.
           # Fail on any export error, and prove the game assembly is inside the package.
@@ -138,6 +181,11 @@ jobs:
           fi
           unzip -l client/build/chaos-idle-debug.apk | grep -E "ChaosIdle\.(Client|App|Domain|Simulation)\.dll" \
             || { echo "::error::The APK does not contain the game's .NET assemblies."; exit 1; }
+          # The Google sign-in plugin must be compiled into the APK and registered in its manifest.
+          unzip -p client/build/chaos-idle-debug.apk 'classes*.dex' | grep -a -q "com/chaosidle/googlesignin/GoogleSignInPlugin" \
+            || { echo "::error::The APK does not contain the Google sign-in plugin."; exit 1; }
+          unzip -p client/build/chaos-idle-debug.apk 'classes*.dex' | grep -a -q "androidx/credentials/CredentialManager" \
+            || { echo "::error::The APK does not contain Credential Manager."; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:

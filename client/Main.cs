@@ -28,6 +28,7 @@ public partial class Main : Control
     private SkillsTab _skillsTab = null!;
     private MapsTab _mapsTab = null!;
     private LootTab _lootTab = null!;
+    private AccountTab _accountTab = null!;
     private FightPanel _fight = null!;
     private CloudPanel _cloud = null!;
     private Godot.Timer _syncSoon = null!;
@@ -111,7 +112,9 @@ public partial class Main : Control
         tabs.AddChild(_passives); // not in a ScrollContainer: dragging pans the tree instead of scrolling
         tabs.AddChild(Scrolling(_skillsTab));
         tabs.AddChild(Scrolling(_lootTab));
-        tabs.TabChanged += _ => { _mapsTab.Refresh(); _passives.Refresh(); _skillsTab.Refresh(); _lootTab.Refresh(); };
+        _accountTab = new AccountTab(() => _session, RefreshScreens);
+        tabs.AddChild(Scrolling(_accountTab));
+        tabs.TabChanged += _ => { _mapsTab.Refresh(); _passives.Refresh(); _skillsTab.Refresh(); _lootTab.Refresh(); _accountTab.Refresh(); };
 
         column.AddChild(new Label { Text = "Chaos Idle", HorizontalAlignment = HorizontalAlignment.Center });
         _cloud = new CloudPanel(() => _session, RefreshScreens);
@@ -208,7 +211,7 @@ public partial class Main : Control
     {
         string url = System.Environment.GetEnvironmentVariable("CHAOSIDLE_SERVER_URL")
                      ?? ProjectSettings.GetSetting("chaos_idle/cloud/server_url", "").AsString();
-        _cloud.Enabled = !string.IsNullOrWhiteSpace(url);
+        _cloud.Enabled = _accountTab.CloudEnabled = !string.IsNullOrWhiteSpace(url);
         if (_cloud.Enabled)
             session.UseCloud(new System.Net.Http.HttpClient { BaseAddress = new Uri(url.TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(10) });
         _cloud.Refresh();
@@ -231,6 +234,7 @@ public partial class Main : Control
         _passives.Refresh();
         _skillsTab.Refresh();
         _lootTab.Refresh();
+        _accountTab.Refresh();
     }
 
     private void PlayLastFight()
