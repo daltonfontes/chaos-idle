@@ -28,15 +28,21 @@ public sealed class ManualTime : TimeProvider
 public sealed class ServerFactory : WebApplicationFactory<Program>
 {
     private readonly PostgresTestDatabase? _database;
+    private readonly IReadOnlyDictionary<string, string> _settings;
 
-    public ServerFactory() { }
+    /// <param name="settings">Configuration for this server; rate limits default to "high" so tests aren't throttled.</param>
+    public ServerFactory(IReadOnlyDictionary<string, string>? settings = null) => _settings = settings ?? new Dictionary<string, string>();
 
     /// <summary>The same API on a fresh PostgreSQL database, dropped when the factory is disposed.</summary>
-    public ServerFactory(PostgresTestDatabase database) => _database = database;
+    public ServerFactory(PostgresTestDatabase database) : this() => _database = database;
 
     public ManualTime Time { get; } = new();
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder) =>
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseSetting("RateLimits:AnonymousPerMinute", "100000");
+        builder.UseSetting("RateLimits:AccountPerMinute", "100000");
+        foreach (var (key, value) in _settings) builder.UseSetting(key, value);
         builder.ConfigureServices(s =>
         {
             s.RemoveAll<TimeProvider>();
@@ -49,6 +55,7 @@ public sealed class ServerFactory : WebApplicationFactory<Program>
                 s.AddSingleton<IServerStore>(_ => PostgresServerStore.Open(_database.ConnectionString));
             }
         });
+    }
 
     public IServerStore Store => Services.GetRequiredService<IServerStore>();
 

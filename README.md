@@ -40,8 +40,9 @@ automatic combat, and bounded offline expeditions.
     both sides changed (the player picks), and offline progress runs on the server.
   - Done: the Account tab with Google sign-in (Android plugin on Credential Manager). It
     needs Google Cloud credentials; see [`docs/google-sign-in.md`](docs/google-sign-in.md).
-  - Next: rate limiting and HTTPS, database backups,
-    crash reporting in the client.
+  - Done: ready to go online. A Docker stack with Caddy (automatic HTTPS), PostgreSQL, daily
+    backups and rate limits, tested end to end in CI; see [`docs/deploy.md`](docs/deploy.md).
+  - Next: a machine and a domain to run it on, crash reporting in the client.
 
 ## Layout
 

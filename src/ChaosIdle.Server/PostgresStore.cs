@@ -142,6 +142,12 @@ public sealed class PostgresServerStore : IServerStore, IDisposable
             r => new TelemetryEvent(r.GetString(0), r.GetString(1), r.GetFieldValue<DateTimeOffset>(2),
                 JsonSerializer.Deserialize<Dictionary<string, string>>(r.GetString(3)) ?? new Dictionary<string, string>()));
 
+    public void Ping()
+    {
+        using var cmd = _source.CreateCommand("select 1");
+        cmd.ExecuteScalar();
+    }
+
     // ---- Locking ----
 
     public T WithAccountLock<T>(string accountId, Func<T> action)

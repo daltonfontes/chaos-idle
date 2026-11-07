@@ -23,8 +23,10 @@ builder.Services.AddSingleton<GameService>();
 builder.Services.AddSingleton<IIdentityVerifier>(sp => OidcIdentityVerifier.FromConfiguration(builder.Configuration, sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddSingleton<AccountService>();
 builder.Services.AddProblemDetails();
+builder.AddHosting();
 
 var app = builder.Build();
+app.UseHosting();
 app.UseExceptionHandler();
 app.Services.GetRequiredService<IServerStore>(); // connect and migrate at startup, not on the first request
 app.MapGameApi();
@@ -54,14 +56,27 @@ namespace ChaosIdle.Server
 
         public static void MapGameApi(this WebApplication app)
         {
-            app.MapGet("/health", (IServerStore store) => Results.Ok(new { status = "ok", store = store is PostgresServerStore ? "postgres" : "memory" }));
+            // Liveness and readiness: also checks that the database answers.
+            app.MapGet("/health", (IServerStore store) =>
+            {
+                string kind = store is PostgresServerStore ? "postgres" : "memory";
+                try
+                {
+                    store.Ping();
+                    return Results.Ok(new { status = "ok", store = kind });
+                }
+                catch (Exception)
+                {
+                    return Results.Json(new { status = "unavailable", store = kind }, statusCode: 503);
+                }
+            });
 
             // A guest account: a device token only, until Google or Apple is linked.
             app.MapPost("/v1/accounts", (AccountService accounts) =>
             {
                 var guest = accounts.CreateGuest();
                 return Results.Created($"/v1/accounts/{guest.AccountId}", new CreateAccountResponse(guest.AccountId, guest.Token));
-            });
+            }).RequireRateLimiting(Hosting.AnonymousPolicy);
 
             // Sign in with a platform ID token: returns the linked account (or a new one) and a new device token.
             app.MapPost("/v1/auth/{provider}", async (string provider, SignInRequest request, AccountService accounts, CancellationToken cancel) =>
@@ -70,9 +85,9 @@ namespace ChaosIdle.Server
                 return result.Outcome == Outcome.Ok && result.Value!.Created
                     ? Results.Created($"/v1/accounts/{result.Value.AccountId}", result.Value)
                     : ToHttp(result);
-            });
+            }).RequireRateLimiting(Hosting.AnonymousPolicy);
 
-            var v1 = app.MapGroup("/v1").AddEndpointFilter(Auth.RequireAccount);
+            var v1 = app.MapGroup("/v1").AddEndpointFilter(Auth.RequireAccount).RequireRateLimiting(Hosting.AccountPolicy);
 
             v1.MapGet("/account", (HttpContext http, AccountService accounts) => Results.Ok(accounts.View(http.Account())));
 
